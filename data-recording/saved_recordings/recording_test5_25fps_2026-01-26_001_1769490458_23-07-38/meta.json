@@ -1,0 +1,218 @@
+{
+  "data_recorder": {
+    "params": {
+      "run_dir": "saved_recordings/recording_test5_25fps_2026-01-26_001_1769490458_23-07-38",
+      "rgb_dev_id": 0,
+      "ir_dev_id": 2,
+      "fps": 25.0,
+      "ir_colormap": "INFERNO",
+      "backend": null,
+      "show": false,
+      "console_status": false,
+      "terminal_quit": true,
+      "view_only": false,
+      "web_preview": true,
+      "use_gstreamer": false
+    },
+    "output_info": {
+      "video_formats": "[mp4]",
+      "tabular_formats": "[csv, npz]",
+      "other_file_formats": "[json]",
+      "recording_target_fps": 25,
+      "creation_unix_time": 1769490460.2283812,
+      "perf_counter_time_start": 442817.283107396
+    }
+  },
+  "cameras": {
+    "rgb": {
+      "type": "Camera",
+      "backend": "v4l2",
+      "device_id": 0,
+      "device_node": "/dev/video0",
+      "exists": true,
+      "video_format": "MJPG",
+      "is_opened": true,
+      "properties": {
+        "width": 640,
+        "height": 480,
+        "fps": 30.0,
+        "fourcc": {
+          "int": 1196444237,
+          "str": "MJPG"
+        }
+      }
+    },
+    "thermal": {
+      "type": "Camera",
+      "backend": "v4l2",
+      "device_id": 2,
+      "device_node": "/dev/video2",
+      "exists": true,
+      "video_format": "YUY2",
+      "is_opened": true,
+      "properties": {
+        "width": 256,
+        "height": 384,
+        "fps": 25.0,
+        "fourcc": {
+          "int": 1448695129,
+          "str": "YUYV"
+        }
+      },
+      "ir_raw_shape": [
+        192,
+        256
+      ],
+      "ir_raw_dtype": "uint16",
+      "conversion": "temp_c = raw/64.0 - 273.15",
+      "display_scale": 2.5,
+      "display_size": [
+        480,
+        640
+      ],
+      "render_mode": "thermal_only",
+      "norm_mode": "minmax",
+      "fixed_tmin_c": 10.0,
+      "fixed_tmax_c": 80.0,
+      "blend_alpha": 0.75,
+      "colormap": "INFERNO"
+    }
+  },
+  "adc": {
+    "type": "ADC",
+    "i2c": {
+      "linux_bus_id": 7,
+      "device_nodes": [
+        "/dev/i2c-7",
+        "/sys/bus/i2c/devices/i2c-7"
+      ],
+      "owns_bus_handle": true
+    },
+    "devices": [
+      {
+        "type": "ADS1115",
+        "address_hex": "0x48",
+        "address_int": 72,
+        "i2c": {
+          "linux_bus_id": 7,
+          "device_node": "/dev/i2c-7",
+          "owns_bus_handle": false
+        },
+        "configuration_intent": {
+          "mode": "single-shot",
+          "inputs": "AINx vs GND (single-ended)",
+          "pga_full_scale_v": 4.096,
+          "data_rate_sps": 860,
+          "comparator": "disabled",
+          "note": "These reflect what read()/read4_once() program into config reg (0x01)."
+        },
+        "channels": [
+          {
+            "channel": 0,
+            "mux_bits": "100",
+            "signal": "AIN0-GND",
+            "name": "0x48_A0"
+          },
+          {
+            "channel": 1,
+            "mux_bits": "101",
+            "signal": "AIN1-GND",
+            "name": "0x48_A1"
+          },
+          {
+            "channel": 2,
+            "mux_bits": "110",
+            "signal": "AIN2-GND",
+            "name": "0x48_A2"
+          },
+          {
+            "channel": 3,
+            "mux_bits": "111",
+            "signal": "AIN3-GND",
+            "name": "0x48_A3"
+          }
+        ],
+        "raw_output": {
+          "type": "int16",
+          "two_complement": true,
+          "expected_max_raw_at_vcc_3v3": 26400
+        }
+      },
+      {
+        "type": "ADS1115",
+        "address_hex": "0x49",
+        "address_int": 73,
+        "i2c": {
+          "linux_bus_id": 7,
+          "device_node": "/dev/i2c-7",
+          "owns_bus_handle": false
+        },
+        "configuration_intent": {
+          "mode": "single-shot",
+          "inputs": "AINx vs GND (single-ended)",
+          "pga_full_scale_v": 4.096,
+          "data_rate_sps": 860,
+          "comparator": "disabled",
+          "note": "These reflect what read()/read4_once() program into config reg (0x01)."
+        },
+        "channels": [
+          {
+            "channel": 0,
+            "mux_bits": "100",
+            "signal": "AIN0-GND",
+            "name": "0x49_A0"
+          },
+          {
+            "channel": 1,
+            "mux_bits": "101",
+            "signal": "AIN1-GND",
+            "name": "0x49_A1"
+          },
+          {
+            "channel": 2,
+            "mux_bits": "110",
+            "signal": "AIN2-GND",
+            "name": "0x49_A2"
+          },
+          {
+            "channel": 3,
+            "mux_bits": "111",
+            "signal": "AIN3-GND",
+            "name": "0x49_A3"
+          }
+        ],
+        "raw_output": {
+          "type": "int16",
+          "two_complement": true,
+          "expected_max_raw_at_vcc_3v3": 26400
+        }
+      }
+    ],
+    "notes": [
+      "Jetson I2C1 commonly appears as Linux i2c-7 depending on device tree / pins used."
+    ]
+  },
+  "ir_raw_writer": {
+    "fps_target": 25.0,
+    "ir_data": {
+      "raw_shape": [
+        192,
+        256
+      ],
+      "raw_dtype": "uint16",
+      "conversion": "temp_c = raw/64.0 - 273.15",
+      "colormap": "INFERNO",
+      "display_scale": 2.5
+    },
+    "ir_npz": {
+      "chunk_frames": 250,
+      "dir": "ir_raw",
+      "pattern": "ir_raw_%06d_%06d.npz",
+      "arrays": [
+        "frame_idx",
+        "t_sample",
+        "ir_raw16"
+      ]
+    }
+  }
+}

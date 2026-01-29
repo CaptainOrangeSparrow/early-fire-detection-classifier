@@ -1,0 +1,11 @@
+===================
+tc001 [dir]
+- Code to view TC001 camera
+
+stream-camera.py
+- stream any video device to an opencv window
+
+venv [dir]
+- Python virtual environment
+
+===================

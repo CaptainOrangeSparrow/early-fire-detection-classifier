@@ -1,0 +1,24 @@
+{
+  "created_unix": 1769415771.634439,
+  "fps_target": 25.0,
+  "ir": {
+    "raw_shape": [
+      192,
+      256
+    ],
+    "raw_dtype": "uint16",
+    "conversion": "temp_c = raw/64.0 - 273.15",
+    "colormap": "INFERNO",
+    "display_scale": 2
+  },
+  "ir_npz": {
+    "chunk_frames": 250,
+    "dir": "ir_raw",
+    "pattern": "ir_raw_%06d_%06d.npz",
+    "arrays": [
+      "frame_idx",
+      "t_sample",
+      "ir_raw16"
+    ]
+  }
+}
