@@ -8,13 +8,17 @@ This repository aims to detect fires at an early stage and classify the type of 
 
 ### GIT
 
-Git on the jetson will be setup using the SSH key route. Any git actions will not prompt a log in due to the stored SSH deploy key. Pushes will be recorded as have been made by the deploy key. Whoever is registered on the jetson's git config global user.email will show up as the user responsible of a commit at the time of commit.
+Git on the jetson is setup using the SSH key route. Any git actions will not prompt a log in due to the stored SSH deploy key. Pushes will be recorded as have been made by the deploy key. Whoever is registered on the jetson's git config global user.email will show up as the user responsible of a commit at the time of commit.
 
 To change the git config global user:
 
 ```git config --global user.email [git email here]```
 
-When you want to do a commit, change the git config global user email to your git email or sign your first name at the end of your commit message (For example add file -firstname).
+When you want to do a COMMIT, change the git config global user email to your git email or sign your first name at the end of your commit message (For example add file -firstname).
+
+Once you attempt to PUSH your changes, you will then be prompted with the following message to provide a passphrase for security (this passphrase is shared among the team members):
+
+```Enter passphrase for key '/home/firedistinguisher/.ssh/id_ed25519':```
 
 -----
 
