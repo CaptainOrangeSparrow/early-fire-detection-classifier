@@ -21,6 +21,7 @@ Once you attempt to PUSH your changes, you will then be prompted with the follow
 ```Enter passphrase for key '/home/firedistinguisher/.ssh/id_ed25519':```
 
 AFTER you finish pushing your changes and making edits, consider running the following command to clear the user.email environment variable so the next developer will be automatically reminded to provide their email when making their commits, thanks!
+
 ```git config --global --unset user.email```
 
 -----
