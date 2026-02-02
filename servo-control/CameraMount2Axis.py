@@ -1,4 +1,5 @@
 import servo
+import Jetson.GPIO as GPIO
 
 class CameraMount2Axis:
     def __init__(self, pan_pin, tilt_pin):

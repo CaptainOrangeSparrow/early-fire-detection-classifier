@@ -1,4 +1,5 @@
 import CameraMount2Axis
+import time
 
 if __name__ == "__main__":
     # Jetson Nano BOARD pins with PWM support
