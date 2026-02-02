@@ -1,3 +1,5 @@
+import servo
+
 class CameraMount2Axis:
     def __init__(self, pan_pin, tilt_pin):
         GPIO.setmode(GPIO.BOARD)
