@@ -8,15 +8,19 @@ class CameraMount2Axis:
             raise ValueError("Pan and Tilt pins must be different.")
 
         GPIO.setmode(GPIO.BOARD)
+        
+        # To view transition types -> servo.py
+        self.transition_type = transition_type
+        self.transition_speed = transition_speed
 
         self.pan = servo.Servo(
             pin=pan_pin,
             min_duty=2.5,
             max_duty=12.5,
             min_angle=0.0,
-            max_angle=180.0
-            transition_type = self.transition_type
-            transition_speed = self.transition_speed
+            max_angle=180.0,
+            transition_type=self.transition_type,
+            transition_speed=self.transition_speed
         )
 
         self.tilt = servo.Servo(
@@ -24,9 +28,9 @@ class CameraMount2Axis:
             min_duty=2.5,
             max_duty=12.5,
             min_angle=0.0,
-            max_angle=180.0
-            transition_type = self.transition_type
-            transition_speed = self.transition_speed
+            max_angle=180.0,
+            transition_type=self.transition_type,
+            transition_speed=self.transition_speed
         )
 
     def set_pan(self, angle):
@@ -54,4 +58,3 @@ class CameraMount2Axis:
         
         # Clean up GPIO
         GPIO.cleanup()
-
