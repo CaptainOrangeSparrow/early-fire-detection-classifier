@@ -2,7 +2,7 @@ import servo
 import Jetson.GPIO as GPIO
 
 class CameraMount2Axis:
-    def __init__(self, pan_pin, tilt_pin):
+    def __init__(self, pan_pin, tilt_pin, transition_type='instant', transition_speed=1.0):
         # Ensure pins are different to prevent conflicts
         if pan_pin == tilt_pin:
             raise ValueError("Pan and Tilt pins must be different.")
@@ -15,6 +15,8 @@ class CameraMount2Axis:
             max_duty=12.5,
             min_angle=0.0,
             max_angle=180.0
+            transition_type = self.transition_type
+            transition_speed = self.transition_speed
         )
 
         self.tilt = servo.Servo(
@@ -23,6 +25,8 @@ class CameraMount2Axis:
             max_duty=12.5,
             min_angle=0.0,
             max_angle=180.0
+            transition_type = self.transition_type
+            transition_speed = self.transition_speed
         )
 
     def set_pan(self, angle):
@@ -50,3 +54,4 @@ class CameraMount2Axis:
         
         # Clean up GPIO
         GPIO.cleanup()
+
