@@ -23,7 +23,7 @@ let winT = [];
 let winY = Array.from({ length: ADC_CHANNELS }, () => []);
 
 // -------------------------
-// Helpers
+// Helpers (ADC Graph)
 // -------------------------
 
 function ingestSample(unix_t, adc) {
@@ -41,6 +41,73 @@ function ingestSample(unix_t, adc) {
     for (let i = 0; i < ADC_CHANNELS; i++) winY[i].shift();
   }
 }
+// -------------------------
+// Env graph Helpers
+// -------------------------
+
+// const ENV_WINDOW_SEC = 300.0; // 5 min looks nice for slow env trends
+const ENV_WINDOW_SEC = WINDOW_SEC
+
+let envT = [];
+let envTemp = [];
+let envRH = [];
+let envCO2 = [];
+
+let lastEnvUnix = null;
+
+function ingestEnv(unix_t, temp_c, rh, co2_ppm) {
+  if (unix_t == null) return;
+
+  if (runT0 === null) runT0 = unix_t;
+  const t = unix_t - runT0;
+
+  envT.push(t);
+  envTemp.push(temp_c != null ? Number(temp_c) : null);
+  envRH.push(rh != null ? Number(rh) : null);
+  envCO2.push(co2_ppm != null ? Number(co2_ppm) : null);
+
+  lastEnvUnix = Number(unix_t);
+
+  // trim window
+  while (envT.length > 0 && (envT[envT.length - 1] - envT[0]) > ENV_WINDOW_SEC) {
+    envT.shift();
+    envTemp.shift();
+    envRH.shift();
+    envCO2.shift();
+  }
+}
+
+function calcStats(arr) {
+  const v = arr.filter(x => x != null && Number.isFinite(x));
+  if (v.length === 0) return null;
+  let mn = v[0], mx = v[0], sum = 0;
+  for (const x of v) { mn = Math.min(mn, x); mx = Math.max(mx, x); sum += x; }
+  return { mn, avg: sum / v.length, mx };
+}
+
+function co2Band(ppm) {
+  if (ppm == null || !Number.isFinite(ppm)) return "-";
+  if (ppm < 800) return "good";
+  if (ppm < 1200) return "ok";
+  if (ppm < 2000) return "stuffy";
+  return "poor";
+}
+
+// -------------------------
+// Other Helpers
+// -------------------------
+
+// Age indicator (Stream + Browser Latency Label)
+let lastMsgUnix = null;
+setInterval(() => {
+  const el = document.getElementById("data_age");
+  if (!el) return;
+
+  if (lastMsgUnix == null) { el.textContent = "--"; return; }
+
+  const ageSec = (Date.now() / 1000) - lastMsgUnix;
+  el.textContent = `${ageSec.toFixed(1)}s ago`;
+}, 200);
 
 
 // -------------------------
@@ -133,6 +200,77 @@ setInterval(() => {
   redrawChart();
 }, Math.round(1000 / DRAW_HZ));
 
+
+// ENV Graph
+const envCtx = document.getElementById("envChart").getContext("2d");
+const envChart = new Chart(envCtx, {
+  type: "line",
+  data: {
+    datasets: [
+      { label: "Temp (°C)", data: [], borderWidth: 1.5, pointRadius: 0, tension: 0.0 },
+      { label: "RH (%RH)", data: [], borderWidth: 1.5, pointRadius: 0, tension: 0.0, yAxisID: "y1" },
+      { label: "CO₂ (ppm)", data: [], borderWidth: 1.5, pointRadius: 0, tension: 0.0, yAxisID: "y2" },
+    ]
+  },
+  options: {
+    animation: false,
+    responsive: true,
+    maintainAspectRatio: false,
+    parsing: false,
+    scales: {
+      x: { type: "linear", title: { display: true, text: "t since env start (s)" } },
+      y: { title: { display: true, text: "°C" } },
+      y1: { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "%RH" } },
+      y2: { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "ppm" }, display: false } // hidden until CO2 exists
+    },
+    plugins: { legend: { display: true, position: "bottom" } }
+  }
+});
+
+function redrawEnv() {
+  if (envT.length === 0) return;
+
+  const tEnd = envT[envT.length - 1];
+  const tStart = Math.max(0, tEnd - ENV_WINDOW_SEC);
+
+  envChart.data.datasets[0].data = envT.map((x, i) => ({ x, y: envTemp[i] })).filter(p => p.y != null);
+  envChart.data.datasets[1].data = envT.map((x, i) => ({ x, y: envRH[i] })).filter(p => p.y != null);
+
+  const hasCO2 = envCO2.some(v => v != null);
+  envChart.options.scales.y2.display = hasCO2;
+  envChart.data.datasets[2].data = envT.map((x, i) => ({ x, y: envCO2[i] })).filter(p => p.y != null);
+
+  envChart.options.scales.x.min = tStart;
+  envChart.options.scales.x.max = tEnd;
+
+  envChart.update("none");
+
+  // update cards
+  const ts = calcStats(envTemp);
+  const hs = calcStats(envRH);
+
+  const lastTemp = [...envTemp].reverse().find(v => v != null);
+  const lastRH = [...envRH].reverse().find(v => v != null);
+  const lastCO2 = [...envCO2].reverse().find(v => v != null);
+
+  document.getElementById("temp_val").textContent = lastTemp != null ? lastTemp.toFixed(2) : "-";
+  document.getElementById("rh_val").textContent = lastRH != null ? lastRH.toFixed(2) : "-";
+  document.getElementById("co2_val").textContent = lastCO2 != null ? Math.round(lastCO2) : "-";
+  document.getElementById("co2_band").textContent = co2Band(lastCO2);
+
+  document.getElementById("temp_stats").textContent = ts ? `${ts.mn.toFixed(2)}/${ts.avg.toFixed(2)}/${ts.mx.toFixed(2)}` : "-";
+  document.getElementById("rh_stats").textContent = hs ? `${hs.mn.toFixed(1)}/${hs.avg.toFixed(1)}/${hs.mx.toFixed(1)}` : "-";
+}
+
+// you can reuse your 10 Hz loop; env can update slower but redraw is cheap
+setInterval(() => {
+  redrawEnv();
+}, Math.round(1000 / 10.0));
+
+
+
+
+
 // -------------------------
 // SSE wiring (example)
 // -------------------------
@@ -208,6 +346,7 @@ function updateClip(labelId, valueId, val) {
 
 es.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
+  if (msg.t != null) lastMsgUnix = Number(msg.t);
 
   // Update status text
   document.getElementById("status").textContent = msg.status;
@@ -231,6 +370,17 @@ es.onmessage = (ev) => {
   // ADC Charts
   if (msg.t != null && msg.adc != null) {
     ingestSample(msg.t, msg.adc);
+  }
+
+  // Environment
+  // Use msg.t as the timestamp if that's your unified sample time.
+  if (msg.t != null) {
+    const temp_c = msg.hdc_temp_c;     // msg temp
+    const rh = msg.hdc_humidity_rh;             // relative humidity
+    const co2 = msg.co2_ppm;       // later
+    if (temp_c != null || rh != null || co2 != null) {
+      ingestEnv(msg.t, temp_c, rh, co2);
+    }
   }
 
   // Color bar
@@ -286,6 +436,9 @@ es.onmessage = (ev) => {
 es.onerror = () => {
   document.getElementById("status").textContent = "Disconnected";
   // Browser will auto-reconnect SSE by default
+  const el = document.getElementById("data_age");
+  if (el) el.textContent = "disconnected";
+
 };
 
 

@@ -100,6 +100,7 @@ class WebPreviewServer:
         get_ir_stats: Callable[[], tuple],
         get_cmap: Callable[[], str],
         get_ir_norm_stats: Callable[[], tuple],
+        get_hdc_data: Callable[[], tuple],
         verbose=False
     ):
         self._meta_info = meta_info
@@ -110,6 +111,7 @@ class WebPreviewServer:
         self.get_ir_stats = get_ir_stats
         self.get_cmap = get_cmap
         self.get_ir_norm_stats = get_ir_norm_stats
+        self.get_hdc_data = get_hdc_data
         self.verbose = verbose
 
         self.runstart = self._meta_info["data_recorder"]["output_info"]["creation_unix_time"]
@@ -194,6 +196,7 @@ class WebPreviewServer:
                     web_fps = float(self._current_web_fps)
                     ir_min, ir_max, ir_avg, ir_center = self.get_ir_stats()
                     norm_min, norm_max, sat_below, sat_above, norm_mode = self.get_ir_norm_stats()
+                    temp, hum = self.get_hdc_data()
                     payload = {
                         "t": time.time(),
                         "status": self.get_status(),
@@ -207,7 +210,9 @@ class WebPreviewServer:
                         "norm_min": norm_min,
                         "sat_above": sat_above,
                         "sat_below": sat_below,
-                        "runstart": self.runstart
+                        "runstart": self.runstart,
+                        "hdc_temp_c": temp,
+                        "hdc_humidity_rh": hum,
                     }
                     # SSE format: "data: <json>\n\n"
                     yield f"data: {json.dumps(payload)}\n\n"

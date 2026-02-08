@@ -119,7 +119,11 @@
     </div>
     <div class="column" style="flex: 2;">
       <div class="card">
-        <div><b>Web Video Stream FPS:</b> <span id="webfps">-</span></div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <b>Status</b>
+          <span class="mono" id="data_age">--</span>
+        </div>
+	<div><b>Web Video Stream FPS:</b> <span id="webfps">-</span></div>
         <div style="height: 8px;"></div>
         <div><b>Status</b></div>
         <pre id="status">Loading...</pre>
@@ -127,17 +131,55 @@
         <div><b>ADC Values (raw)</b></div>
         <table>
           <tbody id="adc">
-            <tr><td class="label">ADC0 CH0</td><td class="value" id="adc_0">-</td></tr>
-            <tr><td class="label">ADC0 CH1</td><td class="value" id="adc_1">-</td></tr>
-            <tr><td class="label">ADC0 CH2</td><td class="value" id="adc_2">-</td></tr>
-            <tr><td class="label">ADC0 CH3</td><td class="value" id="adc_3">-</td></tr>
-            <tr><td class="label">ADC1 CH0</td><td class="value" id="adc_4">-</td></tr>
-            <tr><td class="label">ADC1 CH1</td><td class="value" id="adc_5">-</td></tr>
-            <tr><td class="label">ADC1 CH2</td><td class="value" id="adc_6">-</td></tr>
-            <tr><td class="label">ADC1 CH3</td><td class="value" id="adc_7">-</td></tr>
+            <tr><td class="label">ADC0 CH0 MQ-4 (CH4)</td><td class="value" id="adc_0">-</td></tr>
+            <tr><td class="label">ADC0 CH1 MQ-7 (CO)</td><td class="value" id="adc_1">-</td></tr>
+            <tr><td class="label">ADC0 CH2 MQ-138 (VOCs)</td><td class="value" id="adc_2">-</td></tr>
+            <tr><td class="label">ADC0 CH3 KY-026 Flame</td><td class="value" id="adc_3">-</td></tr>
+            <tr><td class="label">ADC1 CH0 MiCS-6814 NO2</td><td class="value" id="adc_4">-</td></tr>
+            <tr><td class="label">ADC1 CH1 MiCS-6814 NH3</td><td class="value" id="adc_5">-</td></tr>
+            <tr><td class="label">ADC1 CH2 MiCS-6814 CO</td><td class="value" id="adc_6">-</td></tr>
+            <tr><td class="label">ADC1 CH3 (Floating) </td><td class="value" id="adc_7">-</td></tr>
           </tbody>
         </table>
       </div>
+      
+
+      <div class="card" id="env_card">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <b>Environment</b>
+          <span class="mono"> 10Hz refresh | recent 30s</span>
+        </div>
+
+        <div style="height:10px;"></div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+          <div class="card" style="border:1px solid #eee;">
+            <div class="label">Temp</div>
+            <div class="mono" style="font-size:20px;"><span id="temp_val">-</span> <span class="label">°C</span></div>
+            <div class="label" style="font-size:12px;">min/avg/max: <span class="mono" id="temp_stats">-</span></div>
+          </div>
+
+          <div class="card" style="border:1px solid #eee;">
+            <div class="label">Humidity</div>
+            <div class="mono" style="font-size:20px;"><span id="rh_val">-</span> <span class="label">%RH</span></div>
+            <div class="label" style="font-size:12px;">min/avg/max: <span class="mono" id="rh_stats">-</span></div>
+          </div>
+
+          <div class="card" style="border:1px solid #eee;">
+            <div class="label">CO₂</div>
+            <div class="mono" style="font-size:20px;"><span id="co2_val">-</span> <span class="label">ppm</span></div>
+            <div class="label" style="font-size:12px;">
+              <span id="co2_band" class="mono">-</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:10px;"></div>
+        <div style="height:140px;">
+          <canvas id="envChart"></canvas>
+        </div>
+      </div>
+
       <div class="card" style="flex: 2;">
         <div><b>Metadata</b></div>
         <pre id="meta" class="meta-box">Loading...</pre>

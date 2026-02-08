@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 # Custom imports
 from peripherals.cameras import Camera, IRCamera
 from peripherals.adc import ADC
+from peripherals.hdc3022 import HDC3022
 from utilities.fps_tracker import FPSTracker
 from utilities.key_handler import TerminalKeyWatcher, poll_quit_key
 from utilities.web_preview import WebPreviewServer, generate_colorbar_png
@@ -49,6 +50,23 @@ class LatestFrame:
             self._pkt = FramePacket(t=t, frame=frame)
 
     def get(self) -> FramePacket:
+        with self._lock:
+            return self._pkt
+
+@dataclass
+class TempHumPacket:
+    t: float
+    temp: Optional[float] = None
+    humidity: Optional[float] = None
+
+class LatestTempHum:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._pkt = TempHumPacket(t=0.0, temp=None, humidity=None)
+    def set(self, t: float, temp=None, humidity=None):
+        with self._lock:
+            self._pkt = TempHumPacket(t=t, temp=temp, humidity=humidity)
+    def get(self) -> TempHumPacket:
         with self._lock:
             return self._pkt
 
@@ -163,6 +181,10 @@ def adc_worker(adc: ADC, latest: LatestAdc, stop_evt: threading.Event):
         t1 = time.perf_counter()
         latest.set(AdcPacket(t=t1, values=vals, sweep_dt=(t1 - t0)))
 
+def hdc_worker(hdc: HDC3022, latest: LatestTempHum, stop_evt: threading.Event):
+    while not stop_evt.is_set():
+        temp, hum = hdc.read_temp_rh()
+        latest.set(t=time.perf_counter(), temp=temp, humidity=hum)
 
 # ----------------------------
 # Helpers
@@ -255,8 +277,11 @@ class RecorderGUI(QWidget):
 
         # ADC
         self.adc = ADC()
-        self.adc.set_adc_channel_names(0, [None, None, None, None])
-        self.adc.set_adc_channel_names(1, [None, None, None, None])
+        self.adc.set_adc_channel_names(0, ["MQ-4 (CH4)", "MQ-7 (CO)", "MQ-138 (VOCs)", "KY-026 Flame"])
+        self.adc.set_adc_channel_names(1, ["MiCS-6814 NO2", "MiCS-6814 NH3", "MiCS-6814 CO", None])
+
+        # HDC3022
+        self.hdc = HDC3022(i2c_bus=self.adc.get_i2c_bus())
 
         # Try to request fps (some cams ignore it)
         for cap in (self.reg_cam._cap, self.ir_cam._cap):
@@ -266,14 +291,18 @@ class RecorderGUI(QWidget):
         self.latest_reg = LatestFrame()
         self.latest_ir  = LatestIRFrame()
         self.latest_adc = LatestAdc()
+        self.latest_hdc = LatestTempHum()
 
         # Threads
         self.t_reg = threading.Thread(target=camera_worker, args=(self.reg_cam, self.latest_reg, self.stop_evt), daemon=True)
         self.t_ir  = threading.Thread(target=ir_camera_worker, args=(self.ir_cam,  self.latest_ir,  self.stop_evt, ir_colormap.name), daemon=True)
-        self.t_adc = threading.Thread(target=adc_worker,   args=(self.adc,     self.latest_adc, self.stop_evt), daemon=True)
+        self.t_adc = threading.Thread(target=adc_worker, args=(self.adc, self.latest_adc, self.stop_evt), daemon=True)
+        self.t_hdc = threading.Thread(target=hdc_worker, args=(self.hdc, self.latest_hdc, self.stop_evt), daemon=True)
+
         self.t_reg.start()
         self.t_ir.start()
         self.t_adc.start()
+        self.t_hdc.start()
 
         # UI
         self.reg_label = QLabel("Regular camera")
@@ -335,6 +364,7 @@ class RecorderGUI(QWidget):
                 "adc0_ch0","adc0_ch1","adc0_ch2","adc0_ch3",
                 "adc1_ch0","adc1_ch1","adc1_ch2","adc1_ch3",
                 "ir_min", "ir_max", "ir_avg", "ir_center",
+                "hdc_temp", "hdc_humidity",
             ])
 
         # IR Writer. Still create for metadata even if view only
@@ -383,7 +413,8 @@ class RecorderGUI(QWidget):
                 "thermal": self.ir_cam.get_meta_info(),
             },
             "adc": self.adc.get_meta_info(),
-            "ir_raw_writer": self.ir_raw_writer.get_meta_info()
+            "ir_raw_writer": self.ir_raw_writer.get_meta_info(),
+            "temp_and_humidity": self.hdc.get_meta_info(),
         }
         # Write meta json file
         if not self.view_only:
@@ -412,6 +443,9 @@ class RecorderGUI(QWidget):
                     self.latest_ir.get().sat_below,
                     self.latest_ir.get().sat_above,
                     self.latest_ir.get().norm_mode),
+                get_hdc_data=lambda: (
+                    self.latest_hdc.get().temp,
+                    self.latest_hdc.get().humidity),
                 verbose=verbose
             )
             self.web.start()
@@ -468,6 +502,7 @@ class RecorderGUI(QWidget):
         pkt_reg = self.latest_reg.get()
         pkt_ir  = self.latest_ir.get()
         pkt_adc = self.latest_adc.get()
+        pkt_hdc = self.latest_hdc.get()
 
         # UI updates
         if pkt_reg.frame is not None:
@@ -508,6 +543,8 @@ class RecorderGUI(QWidget):
                 f"{pkt_adc.sweep_dt:.6f}",
                 *pkt_adc.values,
                 pkt_ir.tmin, pkt_ir.tmax, pkt_ir.tavg, pkt_ir.tcenter,
+                f"{pkt_hdc.t:.9f}",
+                pkt_hdc.temp, pkt_hdc.humidity,
             ])
         
         self.fps_tracker.tick()
