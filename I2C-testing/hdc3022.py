@@ -32,8 +32,8 @@ class HDC3022:
         time.sleep(CONVERSION_DELAY_S)
 
         # Read 6 bytes: T_MSB, T_LSB, T_CRC, RH_MSB, RH_LSB, RH_CRC
-        rd = i2c_msg.read(ADDR, 6)
-        bus.i2c_rdwr(rd)
+        rd = i2c_msg.read(self.address, 6)
+        self.i2c_bus.i2c_rdwr(rd)
         data = list(rd)
 
         raw_t  = (data[0] << 8) | data[1]
