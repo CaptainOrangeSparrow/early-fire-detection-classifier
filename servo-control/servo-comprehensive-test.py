@@ -49,7 +49,7 @@ def test_linear_transitions(mount):
     time.sleep(1)
     
     # Test different speeds
-    speeds = [0.5, 1.0, 2.0, 5.0, 10.0]
+    speeds = [2.0, 5.0, 10.0]
     
     for speed in speeds:
         print(f"\n  Speed: {speed} deg/tick")
@@ -77,7 +77,7 @@ def test_s_curve_transitions(mount):
     mount.center()
     time.sleep(1)
     
-    speeds = [1.0, 2.0, 5.0]
+    speeds = [3.0, 7.0, 9.0]
     
     for speed in speeds:
         print(f"\n  Speed: {speed} deg/tick")
@@ -92,6 +92,14 @@ def test_s_curve_transitions(mount):
         mount.tilt.set_angle(180, transition_type='s-curve', speed=speed)
         time.sleep(4)
         
+        mount.pan.set_angle(0, transition_type='s-curve', speed=speed)
+        mount.tilt.set_angle(0, transition_type='s-curve', speed=speed)
+        
+        mount.pan.set_angle(90, transition_type='s-curve', speed=speed)
+        mount.tilt.set_angle(90, transition_type='s-curve', speed=speed)
+        time.sleep(4)
+
+
         mount.center()
         time.sleep(3)
 
@@ -102,19 +110,22 @@ def test_ease_out_quad(mount):
     mount.center()
     time.sleep(1)
     
-    speeds = [1.0, 3.0, 5.0]
+    speeds = [4.0, 5.0, 7.0, 9.0]
     
     for speed in speeds:
         print(f"\n  Speed: {speed} deg/tick")
         
         print(f"    → Full sweep with ease-out")
         mount.pan.set_angle(0, transition_type='ease-out-quad', speed=speed)
+        mount.tilt.set_angle(0, transition_type='ease-out-quad', speed=speed)
         time.sleep(3)
         
         mount.pan.set_angle(180, transition_type='ease-out-quad', speed=speed)
+        mount.tilt.set_angle(180, transition_type='ease-out-quad', speed=speed)
         time.sleep(3)
         
         mount.pan.set_angle(90, transition_type='ease-out-quad', speed=speed)
+        mount.tilt.set_angle(90, transition_type='ease-out-quad', speed=speed)
         time.sleep(2)
 
 def test_transition_comparison(mount):
