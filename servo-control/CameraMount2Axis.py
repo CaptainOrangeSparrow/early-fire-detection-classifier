@@ -15,8 +15,6 @@ class CameraMount2Axis:
 
         self.pan = servo.Servo(
             pin=pan_pin,
-            min_duty=2.5,
-            max_duty=12.5,
             min_angle=0.0,
             max_angle=180.0,
             transition_type=self.transition_type,
@@ -25,8 +23,6 @@ class CameraMount2Axis:
 
         self.tilt = servo.Servo(
             pin=tilt_pin,
-            min_duty=2.5,
-            max_duty=12.5,
             min_angle=0.0,
             max_angle=180.0,
             transition_type=self.transition_type,
