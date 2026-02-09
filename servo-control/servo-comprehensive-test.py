@@ -128,12 +128,62 @@ def test_ease_out_quad(mount):
         mount.tilt.set_angle(90, transition_type='ease-out-quad', speed=speed)
         time.sleep(2)
 
+def test_ease_in_out_quad(mount):
+    """Test ease-in-out quadratic transitions"""
+    print_test("Ease-In-Out Quadratic Transitions (Slow Start, Fast Middle, Slow End)")
+    
+    mount.center()
+    time.sleep(1)
+    
+    speeds = [3.0, 5.0, 7.0]
+    
+    for speed in speeds:
+        print(f"\n  Speed: {speed} deg/tick")
+        
+        print(f"    → Full sweep with ease-in-out")
+        mount.pan.set_angle(0, transition_type='ease-in-out-quad', speed=speed)
+        mount.tilt.set_angle(0, transition_type='ease-in-out-quad', speed=speed)
+        time.sleep(3)
+        
+        mount.pan.set_angle(180, transition_type='ease-in-out-quad', speed=speed)
+        mount.tilt.set_angle(180, transition_type='ease-in-out-quad', speed=speed)
+        time.sleep(3)
+        
+        mount.pan.set_angle(90, transition_type='ease-in-out-quad', speed=speed)
+        mount.tilt.set_angle(90, transition_type='ease-in-out-quad', speed=speed)
+        time.sleep(2)
+
+def test_sine_transitions(mount):
+    """Test sine easing transitions"""
+    print_test("Sine Easing Transitions (Very Smooth)")
+    
+    mount.center()
+    time.sleep(1)
+    
+    speeds = [3.0, 5.0, 7.0]
+    
+    for speed in speeds:
+        print(f"\n  Speed: {speed} deg/tick")
+        
+        print(f"    → Diagonal sweep with sine easing")
+        mount.pan.set_angle(0, transition_type='sine', speed=speed)
+        mount.tilt.set_angle(0, transition_type='sine', speed=speed)
+        time.sleep(4)
+        
+        mount.pan.set_angle(180, transition_type='sine', speed=speed)
+        mount.tilt.set_angle(180, transition_type='sine', speed=speed)
+        time.sleep(4)
+        
+        mount.pan.set_angle(90, transition_type='sine', speed=speed)
+        mount.tilt.set_angle(90, transition_type='sine', speed=speed)
+        time.sleep(3)
+
 def test_transition_comparison(mount):
     """Compare all transition types side-by-side"""
     print_test("Transition Type Comparison (Same Speed)")
     
     speed = 2.0
-    transitions = ['instant', 'linear', 's-curve', 'ease-out-quad']
+    transitions = ['instant', 'linear', 's-curve', 'ease-out-quad', 'ease-in-out-quad', 'sine']
     
     for trans_type in transitions:
         print(f"\n  Transition Type: {trans_type}")
@@ -171,27 +221,27 @@ def test_pattern_movements(mount):
         mount.tilt.set_angle(tilt, transition_type='linear', speed=3.0)
         time.sleep(2)
     
-    # Diagonal scan pattern
-    print("\n  Pattern: Diagonal Scan (s-curve)")
+    # Diagonal scan pattern with sine easing
+    print("\n  Pattern: Diagonal Scan (sine easing)")
     scan_positions = [
         (30, 150), (150, 30), (30, 150), (150, 30), (90, 90)
     ]
     for i, (pan, tilt) in enumerate(scan_positions):
         print(f"    → Scan position {i+1}: Pan={pan}°, Tilt={tilt}°")
-        mount.pan.set_angle(pan, transition_type='s-curve', speed=4.0)
-        mount.tilt.set_angle(tilt, transition_type='s-curve', speed=4.0)
+        mount.pan.set_angle(pan, transition_type='sine', speed=4.0)
+        mount.tilt.set_angle(tilt, transition_type='sine', speed=4.0)
         time.sleep(3)
     
-    # Figure-8 approximation
-    print("\n  Pattern: Figure-8 Approximation (linear)")
+    # Figure-8 approximation with ease-in-out
+    print("\n  Pattern: Figure-8 Approximation (ease-in-out)")
     figure8 = [
         (90, 90), (60, 120), (90, 150), (120, 120), 
         (90, 90), (120, 60), (90, 30), (60, 60), (90, 90)
     ]
     for i, (pan, tilt) in enumerate(figure8):
         print(f"    → Point {i+1}: Pan={pan}°, Tilt={tilt}°")
-        mount.pan.set_angle(pan, transition_type='linear', speed=2.0)
-        mount.tilt.set_angle(tilt, transition_type='linear', speed=2.0)
+        mount.pan.set_angle(pan, transition_type='ease-in-out-quad', speed=2.0)
+        mount.tilt.set_angle(tilt, transition_type='ease-in-out-quad', speed=2.0)
         time.sleep(1.5)
 
 def test_stress_rapid_changes(mount):
@@ -223,8 +273,8 @@ def test_simultaneous_movements(mount):
         ((0, 0), "Bottom-Left", 'linear', 2.0),
         ((180, 180), "Top-Right", 's-curve', 3.0),
         ((180, 0), "Bottom-Right", 'ease-out-quad', 2.5),
-        ((0, 180), "Top-Left", 'linear', 3.0),
-        ((90, 90), "Center", 's-curve', 2.0)
+        ((0, 180), "Top-Left", 'ease-in-out-quad', 3.0),
+        ((90, 90), "Center", 'sine', 2.0)
     ]
     
     for (pan, tilt), desc, trans_type, speed in movements:
@@ -283,6 +333,8 @@ def run_all_tests(mount):
         test_linear_transitions(mount)
         test_s_curve_transitions(mount)
         test_ease_out_quad(mount)
+        test_ease_in_out_quad(mount)
+        test_sine_transitions(mount)
         test_transition_comparison(mount)
         test_pattern_movements(mount)
         test_simultaneous_movements(mount)
@@ -317,6 +369,8 @@ def main():
                 'linear': test_linear_transitions,
                 's-curve': test_s_curve_transitions,
                 'ease-out': test_ease_out_quad,
+                'ease-in-out': test_ease_in_out_quad,
+                'sine': test_sine_transitions,
                 'compare': test_transition_comparison,
                 'patterns': test_pattern_movements,
                 'simultaneous': test_simultaneous_movements,
