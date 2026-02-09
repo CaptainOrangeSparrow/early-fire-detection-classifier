@@ -1,5 +1,5 @@
 
-import Jetson.GPIO as GPIO
+import RPi.GPIO as GPIO
 import time
 import threading
 import math
@@ -151,9 +151,54 @@ class Servo:
             else:
                 return start_angle + step
 
+        elif transition_type == 'ease-in-out-quad':
+            direction = 1 if end_angle > start_angle else -1
+            error = abs(end_angle - start_angle)
+            
+            # Quadratic ease-in-out: slow start, fast middle, slow end
+            # Normalize error to 0-1 range
+            t = min(error / 90.0, 1.0)
+            
+            # Ease-in-out quad formula
+            if t < 0.5:
+                # First half: ease in (accelerate)
+                factor = 2 * t * t
+            else:
+                # Second half: ease out (decelerate)
+                factor = 1 - (-2 * t + 2) ** 2 / 2
+            
+            # Ensure minimum speed to avoid stalling
+            effective_step = speed * max(factor, 0.1)
+            step = effective_step * direction
+            
+            if abs(step) > error:
+                return end_angle
+            else:
+                return start_angle + step
+
+        elif transition_type == 'sine':
+            direction = 1 if end_angle > start_angle else -1
+            error = abs(end_angle - start_angle)
+            
+            # Sine easing: very smooth acceleration and deceleration
+            # Normalize error to 0-1 range
+            t = min(error / 90.0, 1.0)
+            
+            # Sine ease-in-out formula: -(cos(π * t) - 1) / 2
+            factor = -(math.cos(math.pi * t) - 1) / 2
+            
+            # Ensure minimum speed to avoid stalling
+            effective_step = speed * max(factor, 0.1)
+            step = effective_step * direction
+            
+            if abs(step) > error:
+                return end_angle
+            else:
+                return start_angle + step
+
         else:
             return end_angle
-
+        
     def _apply_angle(self, angle):
         """Internal function to write to hardware"""
         duty = self.angle_to_duty(angle)
