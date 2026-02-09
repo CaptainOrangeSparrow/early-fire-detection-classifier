@@ -144,11 +144,11 @@ class IRCamera(Camera):
 
         # rendering and norm modes
         self.render_mode = IRCamera.IRRenderMode.THERMAL_ONLY
-        self.norm_mode = IRCamera.IRNormMode.MINMAX # MINMAX or FIXED
+        self.norm_mode = IRCamera.IRNormMode.FIXED # MINMAX or FIXED
 
         # only used if norm_mode = FIXED
         self.fixed_tmin_c = 10.0
-        self.fixed_tmax_c = 80.0
+        self.fixed_tmax_c = 30.0
         self.sat_above = 0.0
         self.sat_below = 0.0
         #only ussed if render_mode = BLEND
