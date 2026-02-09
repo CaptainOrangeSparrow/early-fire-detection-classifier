@@ -13,8 +13,8 @@ class Servo:
         max_duty=12.5,
         min_angle=0.0,
         max_angle=180.0,
-        transition_type='instant',
-        transition_speed=1.0
+        transition_type='ease-in-out-quad',
+        transition_speed=5.0
     ):
         self.pin = pin
         self.frequency = frequency

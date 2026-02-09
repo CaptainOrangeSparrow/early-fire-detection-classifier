@@ -91,9 +91,9 @@ class MultiViewDisplay:
         self.disp = st7735.ST7735(
             port=0,
             cs=0,
-            dc="PQ.06",
+            dc=31,
             backlight=None,
-            rst="PQ.05",
+            rst=28,
             width=128,
             height=160,
             rotation=0,
