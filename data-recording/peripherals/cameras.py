@@ -133,7 +133,7 @@ class IRCamera(Camera):
         FIXED = "fixed"                  # fixed temp window
 
 
-    def __init__(self, device_id, colormap: "IRCamera.ColorMap", use_gstreamer=False, gst_pipeline=None, video_format="YUY2"):
+    def __init__(self, device_id, colormap: "IRCamera.ColorMap", use_gstreamer=False, gst_pipeline=None, video_format="YUY2", norm_settings=("minmax", 80.0, 10.0)):
         if use_gstreamer and gst_pipeline is None:
             print("Using Default-Custom-Defined IR GStreamer Pipeline...")
             gst_pipeline = self.gst_pipeline(device_id, 256, 384, 25) #256x192 with 2x height due to two frames
@@ -142,13 +142,20 @@ class IRCamera(Camera):
         self.colormap_name = colormap.name
         self._cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
 
+        norm_mode, norm_max, norm_min = norm_settings
+        if norm_mode.lower() == "minmax":
+            norm_mode = IRCamera.IRNormMode.MINMAX
+        else:
+            norm_mode = IRCamera.IRNormMode.FIXED
+
         # rendering and norm modes
         self.render_mode = IRCamera.IRRenderMode.THERMAL_ONLY
-        self.norm_mode = IRCamera.IRNormMode.FIXED # MINMAX or FIXED
+        #self.norm_mode = IRCamera.IRNormMode.FIXED # MINMAX or FIXED
+        self.norm_mode = norm_mode
 
         # only used if norm_mode = FIXED
-        self.fixed_tmin_c = 10.0
-        self.fixed_tmax_c = 30.0
+        self.fixed_tmin_c = norm_min
+        self.fixed_tmax_c = norm_max
         self.sat_above = 0.0
         self.sat_below = 0.0
         #only ussed if render_mode = BLEND

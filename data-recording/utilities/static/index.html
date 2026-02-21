@@ -58,6 +58,20 @@
       padding: 6px;
       border-radius: 6px;
     }
+    .band-good {
+      color: #2e7d32;   /* green */
+      font-weight: 600;
+    }
+
+    .band-elevated {
+      color: #f9a825;   /* amber */
+      font-weight: 600;
+    }
+
+    .band-danger {
+      color: #c62828;   /* red */
+      font-weight: 700;
+    }
 
 
   </style>
@@ -143,40 +157,82 @@
         </table>
       </div>
       
-
       <div class="card" id="env_card">
         <div style="display:flex; justify-content:space-between; align-items:baseline;">
           <b>Environment</b>
-          <span class="mono"> 10Hz refresh | recent 30s</span>
+          <span class="mono">10Hz refresh | recent 30s</span>
         </div>
 
         <div style="height:10px;"></div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+
           <div class="card" style="border:1px solid #eee;">
             <div class="label">Temp</div>
-            <div class="mono" style="font-size:20px;"><span id="temp_val">-</span> <span class="label">°C</span></div>
-            <div class="label" style="font-size:12px;">min/avg/max: <span class="mono" id="temp_stats">-</span></div>
+            <div class="mono" style="font-size:20px;">
+              <span id="temp_val">-</span>
+              <span class="label">°C</span>
+            </div>
+            <div class="label" style="font-size:12px;">
+              min/avg/max: <span class="mono" id="temp_stats">-</span>
+            </div>
           </div>
 
           <div class="card" style="border:1px solid #eee;">
             <div class="label">Humidity</div>
-            <div class="mono" style="font-size:20px;"><span id="rh_val">-</span> <span class="label">%RH</span></div>
-            <div class="label" style="font-size:12px;">min/avg/max: <span class="mono" id="rh_stats">-</span></div>
-          </div>
-
-          <div class="card" style="border:1px solid #eee;">
-            <div class="label">CO₂</div>
-            <div class="mono" style="font-size:20px;"><span id="co2_val">-</span> <span class="label">ppm</span></div>
+            <div class="mono" style="font-size:20px;">
+              <span id="rh_val">-</span>
+              <span class="label">%RH</span>
+            </div>
             <div class="label" style="font-size:12px;">
-              <span id="co2_band" class="mono">-</span>
+              min/avg/max: <span class="mono" id="rh_stats">-</span>
             </div>
           </div>
+
         </div>
 
         <div style="height:10px;"></div>
         <div style="height:140px;">
           <canvas id="envChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card" id="carbon_gas_card">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <b>CO2/CO Sensors</b>
+          <span class="mono">1Hz update</span>
+        </div>
+
+        <div style="height:10px;"></div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+
+          <div class="card" style="border:1px solid #eee;">
+            <div class="label">CO₂</div>
+            <div class="mono" style="font-size:20px;">
+              <span id="co2_val">-</span>
+              <span class="label">ppm</span>
+            </div>
+            <div class="label" style="font-size:12px;">
+              <span id="co2_band" class="mono">-</span>
+            </div>
+          </div>
+
+          <div class="card" style="border:1px solid #eee;">
+            <div class="label">CO</div>
+            <div class="mono" style="font-size:20px;">
+              <span id="co_val">-</span>
+              <span class="label">ppm</span>
+            </div>
+            <div class="label" style="font-size:12px;">
+              <span id="co_band" class="mono">-</span>
+            </div>
+          </div> 
+        </div>
+
+	<div style="height:10px;"></div>
+	<div style="height:160px;">
+          <canvas id="gasChart"></canvas>
         </div>
       </div>
 

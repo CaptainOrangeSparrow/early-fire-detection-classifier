@@ -51,11 +51,10 @@ const ENV_WINDOW_SEC = WINDOW_SEC
 let envT = [];
 let envTemp = [];
 let envRH = [];
-let envCO2 = [];
 
 let lastEnvUnix = null;
 
-function ingestEnv(unix_t, temp_c, rh, co2_ppm) {
+function ingestEnv(unix_t, temp_c, rh) {
   if (unix_t == null) return;
 
   if (runT0 === null) runT0 = unix_t;
@@ -64,7 +63,6 @@ function ingestEnv(unix_t, temp_c, rh, co2_ppm) {
   envT.push(t);
   envTemp.push(temp_c != null ? Number(temp_c) : null);
   envRH.push(rh != null ? Number(rh) : null);
-  envCO2.push(co2_ppm != null ? Number(co2_ppm) : null);
 
   lastEnvUnix = Number(unix_t);
 
@@ -73,7 +71,6 @@ function ingestEnv(unix_t, temp_c, rh, co2_ppm) {
     envT.shift();
     envTemp.shift();
     envRH.shift();
-    envCO2.shift();
   }
 }
 
@@ -83,14 +80,6 @@ function calcStats(arr) {
   let mn = v[0], mx = v[0], sum = 0;
   for (const x of v) { mn = Math.min(mn, x); mx = Math.max(mx, x); sum += x; }
   return { mn, avg: sum / v.length, mx };
-}
-
-function co2Band(ppm) {
-  if (ppm == null || !Number.isFinite(ppm)) return "-";
-  if (ppm < 800) return "good";
-  if (ppm < 1200) return "ok";
-  if (ppm < 2000) return "stuffy";
-  return "poor";
 }
 
 // -------------------------
@@ -209,7 +198,7 @@ const envChart = new Chart(envCtx, {
     datasets: [
       { label: "Temp (°C)", data: [], borderWidth: 1.5, pointRadius: 0, tension: 0.0 },
       { label: "RH (%RH)", data: [], borderWidth: 1.5, pointRadius: 0, tension: 0.0, yAxisID: "y1" },
-      { label: "CO₂ (ppm)", data: [], borderWidth: 1.5, pointRadius: 0, tension: 0.0, yAxisID: "y2" },
+      // { label: "CO₂ (ppm)", data: [], borderWidth: 1.5, pointRadius: 0, tension: 0.0, yAxisID: "y2" },
     ]
   },
   options: {
@@ -236,9 +225,9 @@ function redrawEnv() {
   envChart.data.datasets[0].data = envT.map((x, i) => ({ x, y: envTemp[i] })).filter(p => p.y != null);
   envChart.data.datasets[1].data = envT.map((x, i) => ({ x, y: envRH[i] })).filter(p => p.y != null);
 
-  const hasCO2 = envCO2.some(v => v != null);
-  envChart.options.scales.y2.display = hasCO2;
-  envChart.data.datasets[2].data = envT.map((x, i) => ({ x, y: envCO2[i] })).filter(p => p.y != null);
+  // const hasCO2 = envCO2.some(v => v != null);
+  // envChart.options.scales.y2.display = hasCO2;
+  // envChart.data.datasets[2].data = envT.map((x, i) => ({ x, y: envCO2[i] })).filter(p => p.y != null);
 
   envChart.options.scales.x.min = tStart;
   envChart.options.scales.x.max = tEnd;
@@ -251,12 +240,12 @@ function redrawEnv() {
 
   const lastTemp = [...envTemp].reverse().find(v => v != null);
   const lastRH = [...envRH].reverse().find(v => v != null);
-  const lastCO2 = [...envCO2].reverse().find(v => v != null);
+  // const lastCO2 = [...envCO2].reverse().find(v => v != null);
 
   document.getElementById("temp_val").textContent = lastTemp != null ? lastTemp.toFixed(2) : "-";
   document.getElementById("rh_val").textContent = lastRH != null ? lastRH.toFixed(2) : "-";
-  document.getElementById("co2_val").textContent = lastCO2 != null ? Math.round(lastCO2) : "-";
-  document.getElementById("co2_band").textContent = co2Band(lastCO2);
+  // document.getElementById("co2_val").textContent = lastCO2 != null ? Math.round(lastCO2) : "-";
+  // document.getElementById("co2_band").textContent = co2Band(lastCO2);
 
   document.getElementById("temp_stats").textContent = ts ? `${ts.mn.toFixed(2)}/${ts.avg.toFixed(2)}/${ts.mx.toFixed(2)}` : "-";
   document.getElementById("rh_stats").textContent = hs ? `${hs.mn.toFixed(1)}/${hs.avg.toFixed(1)}/${hs.mx.toFixed(1)}` : "-";
@@ -268,6 +257,146 @@ setInterval(() => {
 }, Math.round(1000 / 10.0));
 
 
+//////////////////////
+//
+// CO2 and CO Graph
+//
+//////////////////////
+
+// CO2 and CO GAS Graph
+const gasCtx = document.getElementById("gasChart").getContext("2d");
+const gasChart = new Chart(gasCtx, {
+  type: "line",
+  data: {
+    datasets: [
+      { label: "CO₂ (ppm)", data: [], borderWidth: 1.5, pointRadius: 0, tension: 0.0 },
+      { label: "CO (ppm)",  data: [], borderWidth: 1.5, pointRadius: 0, tension: 0.0, yAxisID: "y1" },
+    ]
+  },
+  options: {
+    animation: false,
+    responsive: true,
+    maintainAspectRatio: false,
+    parsing: false,
+    scales: {
+      x: {
+        type: "linear",
+        title: { display: true, text: "t since gas start (s)" }
+      },
+
+      y: {
+        title: {
+          display: true,
+          text: "CO₂ (ppm)",
+          color: "#1f77b4"     // match CO₂ line
+        },
+        ticks: {
+          color: "#1f77b4"
+        }
+      },
+
+      y1: {
+        position: "right",
+        grid: { drawOnChartArea: false },
+        title: {
+          display: true,
+          text: "CO (ppm)",
+          color: "#d62728"     // match CO line
+        },
+        ticks: {
+          color: "#d62728"
+        }
+      }
+    },
+    plugins: { legend: { display: true, position: "bottom" } }
+  }
+});
+
+const GAS_WINDOW_SEC = 300.0; // 5 min recommended for gases
+
+let gasT = [];
+let gasCO2 = [];
+let gasCO = [];
+
+let lastGasUnix = null;
+
+function ingestGas(unix_t, co2_ppm, co_ppm) {
+  if (unix_t == null) return;
+
+  if (runT0 === null) runT0 = unix_t;
+  const t = unix_t - runT0;
+
+  gasT.push(t);
+  gasCO2.push(co2_ppm != null ? Number(co2_ppm) : null);
+  gasCO.push(co_ppm != null ? Number(co_ppm) : null);
+
+  lastGasUnix = Number(unix_t);
+
+  while (gasT.length > 0 && (gasT[gasT.length - 1] - gasT[0]) > GAS_WINDOW_SEC) {
+    gasT.shift();
+    gasCO2.shift();
+    gasCO.shift();
+  }
+}
+function co2Band(co2) {
+  if (co2 == null || Number.isNaN(co2)) {
+    return { label: "-", cls: "" };
+  }
+
+  if (co2 < 800) return { label: "Good", cls: "band-good" };
+  if (co2 < 1500) return { label: "Stale", cls: "band-elevated" };
+  return { label: "Poor", cls: "band-danger" };
+}
+function coBand(co_ppm) {
+  if (co_ppm == null || Number.isNaN(co_ppm)) {
+    return { label: "-", cls: "" };
+  }
+
+  const v = Number(co_ppm);
+
+  if (v < 9) return { label: "Good", cls: "band-good" };
+  if (v < 35) return { label: "Elevated", cls: "band-elevated" };
+  return { label: "Danger!", cls: "band-danger" };
+}
+
+function redrawGas() {
+  if (gasT.length === 0) return;
+
+  const tEnd = gasT[gasT.length - 1];
+  const tStart = Math.max(0, tEnd - GAS_WINDOW_SEC);
+
+  gasChart.data.datasets[0].data = gasT
+    .map((x, i) => ({ x, y: gasCO2[i] }))
+    .filter(p => p.y != null);
+
+  gasChart.data.datasets[1].data = gasT
+    .map((x, i) => ({ x, y: gasCO[i] }))
+    .filter(p => p.y != null);
+
+  gasChart.options.scales.x.min = tStart;
+  gasChart.options.scales.x.max = tEnd;
+
+  gasChart.update("none");
+
+  // Update gas cards (optional but usually you want this here)
+  const lastCO2 = [...gasCO2].reverse().find(v => v != null);
+  const lastCO  = [...gasCO ].reverse().find(v => v != null);
+
+  document.getElementById("co2_val").textContent = lastCO2 != null ? Math.round(lastCO2) : "-";
+  const co2Label = document.getElementById("co2_band");
+  const co2BandInfo = co2Band(lastCO2);
+  co2Label.textContent = co2BandInfo.label;
+  co2Label.className = "mono " + co2BandInfo.cls;
+
+  document.getElementById("co_val").textContent = lastCO != null ? lastCO.toFixed(1) : "-";
+  const coLabel = document.getElementById("co_band");
+  const coBandInfo = coBand(lastCO);
+  coLabel.textContent = coBandInfo.label;
+  coLabel.className = "mono " + coBandInfo.cls;
+}
+setInterval(() => {
+  redrawGas();
+}, 200); // 5 Hz
 
 
 
@@ -377,11 +506,19 @@ es.onmessage = (ev) => {
   if (msg.t != null) {
     const temp_c = msg.hdc_temp_c;     // msg temp
     const rh = msg.hdc_humidity_rh;             // relative humidity
-    const co2 = msg.co2_ppm;       // later
-    if (temp_c != null || rh != null || co2 != null) {
-      ingestEnv(msg.t, temp_c, rh, co2);
+    if (temp_c != null || rh != null) {
+      ingestEnv(msg.t, temp_c, rh);
     }
   }
+  // CO2 + CO Gas
+  if (msg.t != null) {
+    const co2 = msg.co2_ppm;
+    const co = msg.co_ppm;
+    if (co2 != null || co != null) {
+      ingestGas(msg.t, co2, co);
+    }
+  }
+
 
   // Color bar
   /*

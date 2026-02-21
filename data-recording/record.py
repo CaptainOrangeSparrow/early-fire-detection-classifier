@@ -26,6 +26,8 @@ from PySide6.QtWidgets import (
 from peripherals.cameras import Camera, IRCamera
 from peripherals.adc import ADC
 from peripherals.hdc3022 import HDC3022
+from peripherals.uart_sensors import SEN0219, ZE07CO
+from peripherals.uart_sensors import CO2Sample as CO2Packet
 from utilities.fps_tracker import FPSTracker
 from utilities.key_handler import TerminalKeyWatcher, poll_quit_key
 from utilities.web_preview import WebPreviewServer, generate_colorbar_png
@@ -134,6 +136,30 @@ class LatestAdc:
             return self._pkt
 
 
+# CO2Packet imported from peripherals.uart_sensors
+class LatestSEN0219:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._pkt = CO2Packet(t=0.0, ppm=0, raw_hex="0x00", repeated=False)
+    def set(self, co2_reading: CO2Packet):
+        with self._lock:
+            self._pkt = co2_reading
+    def get(self) -> CO2Packet:
+        with self._lock:
+            return self._pkt
+# CO2Packet is same format for CO ZE07.
+class LatestZE07CO:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._pkt = CO2Packet(t=0.0, ppm=0, raw_hex="0x00", repeated=False)
+    def set(self, co_reading: CO2Packet):
+        with self._lock:
+            self._pkt = co_reading
+    def get(self) -> CO2Packet:
+        with self._lock:
+            return self._pkt
+
+
 # ----------------------------
 # Workers
 # ----------------------------
@@ -185,6 +211,14 @@ def hdc_worker(hdc: HDC3022, latest: LatestTempHum, stop_evt: threading.Event):
     while not stop_evt.is_set():
         temp, hum = hdc.read_temp_rh()
         latest.set(t=time.perf_counter(), temp=temp, humidity=hum)
+def sen0219_worker(sen0219: SEN0219, latest: LatestSEN0219, stop_evt: threading.Event):
+    while not stop_evt.is_set():
+        latest.set(co2_reading=sen0219.read_sample())
+def ze07co_worker(ze07co: ZE07CO, latest: LatestZE07CO, stop_evt: threading.Event):
+    while not stop_evt.is_set():
+        latest.set(co_reading=ze07co.read_sample())
+        
+
 
 # ----------------------------
 # Helpers
@@ -251,6 +285,7 @@ class RecorderGUI(QWidget):
         ir_id: int,
         fps: float,
         ir_colormap: IRCamera.ColorMap,
+        ir_norm_settings: tuple,
         backend: Optional[int] = None,
         show: bool = True,
         console_status: bool = False,
@@ -273,7 +308,7 @@ class RecorderGUI(QWidget):
         
         # Cameras
         self.reg_cam = Camera(reg_id, use_gstreamer=use_gstreamer)
-        self.ir_cam = IRCamera(ir_id, ir_colormap, use_gstreamer=use_gstreamer)
+        self.ir_cam = IRCamera(ir_id, ir_colormap, use_gstreamer=use_gstreamer, norm_settings=ir_norm_settings)
 
         # ADC
         self.adc = ADC()
@@ -282,6 +317,10 @@ class RecorderGUI(QWidget):
 
         # HDC3022
         self.hdc = HDC3022(i2c_bus=self.adc.get_i2c_bus())
+
+        # UART
+        self.sen0219 = SEN0219()
+        self.ze07co = ZE07CO()
 
         # Try to request fps (some cams ignore it)
         for cap in (self.reg_cam._cap, self.ir_cam._cap):
@@ -292,17 +331,23 @@ class RecorderGUI(QWidget):
         self.latest_ir  = LatestIRFrame()
         self.latest_adc = LatestAdc()
         self.latest_hdc = LatestTempHum()
+        self.latest_sen0219 = LatestSEN0219()
+        self.latest_ze07co = LatestZE07CO()
 
         # Threads
         self.t_reg = threading.Thread(target=camera_worker, args=(self.reg_cam, self.latest_reg, self.stop_evt), daemon=True)
         self.t_ir  = threading.Thread(target=ir_camera_worker, args=(self.ir_cam,  self.latest_ir,  self.stop_evt, ir_colormap.name), daemon=True)
         self.t_adc = threading.Thread(target=adc_worker, args=(self.adc, self.latest_adc, self.stop_evt), daemon=True)
         self.t_hdc = threading.Thread(target=hdc_worker, args=(self.hdc, self.latest_hdc, self.stop_evt), daemon=True)
+        self.t_sen = threading.Thread(target=sen0219_worker, args=(self.sen0219, self.latest_sen0219, self.stop_evt), daemon=True)
+        self.t_ze07 = threading.Thread(target=ze07co_worker, args=(self.ze07co, self.latest_ze07co, self.stop_evt), daemon=True)
 
         self.t_reg.start()
         self.t_ir.start()
         self.t_adc.start()
         self.t_hdc.start()
+        self.t_sen.start()
+        self.t_ze07.start()
 
         # UI
         self.reg_label = QLabel("Regular camera")
@@ -364,7 +409,9 @@ class RecorderGUI(QWidget):
                 "adc0_ch0","adc0_ch1","adc0_ch2","adc0_ch3",
                 "adc1_ch0","adc1_ch1","adc1_ch2","adc1_ch3",
                 "ir_min", "ir_max", "ir_avg", "ir_center",
-                "hdc_temp", "hdc_humidity",
+                "t_hdc_sample", "hdc_temp", "hdc_humidity",
+                "t_sen0219_sample", "co2_ppm",
+                "t_ze07co_sample", "co_ppm",
             ])
 
         # IR Writer. Still create for metadata even if view only
@@ -415,6 +462,10 @@ class RecorderGUI(QWidget):
             "adc": self.adc.get_meta_info(),
             "ir_raw_writer": self.ir_raw_writer.get_meta_info(),
             "temp_and_humidity": self.hdc.get_meta_info(),
+            "uart": {
+                "sen0219": self.sen0219.get_meta_info(),
+                "ze07-co": self.ze07co.get_meta_info(),
+            },
         }
         # Write meta json file
         if not self.view_only:
@@ -446,6 +497,9 @@ class RecorderGUI(QWidget):
                 get_hdc_data=lambda: (
                     self.latest_hdc.get().temp,
                     self.latest_hdc.get().humidity),
+                get_carbon_data=lambda: (
+                    self.latest_sen0219.get().ppm,
+                    self.latest_ze07co.get().ppm),
                 verbose=verbose
             )
             self.web.start()
@@ -503,6 +557,8 @@ class RecorderGUI(QWidget):
         pkt_ir  = self.latest_ir.get()
         pkt_adc = self.latest_adc.get()
         pkt_hdc = self.latest_hdc.get()
+        pkt_sen = self.latest_sen0219.get()
+        pkt_ze07 = self.latest_ze07co.get()
 
         # UI updates
         if pkt_reg.frame is not None:
@@ -545,6 +601,10 @@ class RecorderGUI(QWidget):
                 pkt_ir.tmin, pkt_ir.tmax, pkt_ir.tavg, pkt_ir.tcenter,
                 f"{pkt_hdc.t:.9f}",
                 pkt_hdc.temp, pkt_hdc.humidity,
+                f"{pkt_sen.t:.9f}",
+                pkt_sen.ppm,
+                f"{pkt_ze07.t:.9f}",
+                pkt_ze07.ppm,
             ])
         
         self.fps_tracker.tick()
@@ -626,9 +686,12 @@ def parse_args():
     p.add_argument("--no-gui", action="store_true", help="Run headless (still stops on q if focused window exists)")
     p.add_argument("--console-status", action="store_true", help="Also print status + ADC values live to console")
     p.add_argument("--view-only", action="store_true", help="Show streams + ADC but do not write any recordings")
-    p.add_argument("--web-preview", action="store_true", help="Serve a browser preview (MJPEG + JSON) at http://localhost:5000/")
+    p.add_argument("--web-stream", action="store_true", help="Serve a browser web stream (MJPEG + JSON) at http://localhost:5000/")
     p.add_argument("--gstreamer", action="store_true", help="Use GStreamer pipelines for camera capture (cv2.CAP_GSTREAMER)")
     p.add_argument("-v", "--verbose", action="store_true", help="Print out detailed logging. (For web preview)")
+    p.add_argument("--ir-norm", type=str, default="minmax", help="Set the normalization method for IR camera frames. (minmax or fixed)")
+    p.add_argument("--ir-max", type=float, default="80.0", help="Set the maximum temperature for the IR camera in fixed normalization mode")
+    p.add_argument("--ir-min", type=float, default="10.0", help="Set the minimum temperature for the IR camera in fixed normalization mode")
 
     return p.parse_args()
 
@@ -656,7 +719,8 @@ def main():
     else:
         print("Saving to:", run_dir)
         print("Recording started. Press 'q' to stop the recording and save\n")
-
+    
+    ir_norm_settings = (args.ir_norm, args.ir_max, args.ir_min)
     app = QApplication(sys.argv)
     w = RecorderGUI(
         run_dir=run_dir,
@@ -664,11 +728,12 @@ def main():
         ir_id=args.infrared_camera_id,
         fps=args.fps,
         ir_colormap=cmap,
+        ir_norm_settings = ir_norm_settings,
         show=(not args.no_gui),
         console_status=args.console_status,
         terminal_quit = True,
         view_only = args.view_only,
-        web_preview = args.web_preview,
+        web_preview = args.web_stream,
         use_gstreamer = args.gstreamer,
         verbose = args.verbose
     )
