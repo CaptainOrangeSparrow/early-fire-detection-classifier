@@ -1,9 +1,15 @@
 import time, binascii
 import serial
 
+# SEN0219
 PORT = "/dev/ttyUSB0"
 BAUD = 9600
 CMD  = bytes([0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79])
+
+# ZE07-CO
+#PORT
+#BAUD
+#CMD
 
 def read_exact(s, n, timeout_s=0.5):
     end = time.time() + timeout_s
