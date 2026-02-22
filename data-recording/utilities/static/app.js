@@ -207,10 +207,32 @@ const envChart = new Chart(envCtx, {
     maintainAspectRatio: false,
     parsing: false,
     scales: {
-      x: { type: "linear", title: { display: true, text: "t since env start (s)" } },
-      y: { title: { display: true, text: "°C" } },
-      y1: { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "%RH" } },
-      y2: { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "ppm" }, display: false } // hidden until CO2 exists
+      x: {
+        type: "linear",
+        title: { display: true, text: "t since env start (s)" }
+      },
+      // Temp axis (left)
+      y: {
+        title: { display: true, text: "°C", color: "#1976d2" },
+        ticks: { color: "#1976d2" },
+        // optional:
+        // grid: { color: "rgba(0,0,0,0.05)" }
+      },
+      // RH axis (right)
+      y1: {
+        position: "right",
+        grid: { drawOnChartArea: false },
+        title: { display: true, text: "%RH", color: "#d32f2f" },
+        ticks: { color: "#d32f2f" }
+      },
+      // CO2 axis (if you still keep it around, hidden unless used)
+      y2: {
+        position: "right",
+        grid: { drawOnChartArea: false },
+        title: { display: true, text: "ppm", color: "#1f77b4" },
+        ticks: { color: "#1f77b4" },
+        display: false
+      }
     },
     plugins: { legend: { display: true, position: "bottom" } }
   }
