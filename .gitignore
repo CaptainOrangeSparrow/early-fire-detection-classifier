@@ -1,1 +1,4 @@
 servo-control/jetson-gpio
+data-recording/test_recording/
+data-recording/saved_recordings/
+data-recording/collect-02-21-26/

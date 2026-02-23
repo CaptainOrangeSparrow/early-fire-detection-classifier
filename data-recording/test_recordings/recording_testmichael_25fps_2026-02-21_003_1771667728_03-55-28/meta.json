@@ -1,0 +1,264 @@
+{
+  "data_recorder": {
+    "params": {
+      "run_dir": "test_recordings/recording_testmichael_25fps_2026-02-21_003_1771667728_03-55-28",
+      "rgb_dev_id": 0,
+      "ir_dev_id": 2,
+      "fps": 25.0,
+      "ir_colormap": "INFERNO",
+      "backend": null,
+      "show": false,
+      "console_status": false,
+      "terminal_quit": true,
+      "view_only": false,
+      "web_preview": true,
+      "use_gstreamer": false,
+      "verbose": false
+    },
+    "output_info": {
+      "video_formats": "[mp4]",
+      "tabular_formats": "[csv, npz]",
+      "other_file_formats": "[json]",
+      "recording_target_fps": 25,
+      "creation_unix_time": 1771667731.2913458,
+      "perf_counter_time_start": 6803.494610909
+    }
+  },
+  "cameras": {
+    "rgb": {
+      "type": "Camera",
+      "backend": "v4l2",
+      "device_id": 0,
+      "device_node": "/dev/video0",
+      "exists": true,
+      "video_format": "MJPG",
+      "is_opened": true,
+      "properties": {
+        "width": 640,
+        "height": 480,
+        "fps": 30.0,
+        "fourcc": {
+          "int": 1196444237,
+          "str": "MJPG"
+        }
+      }
+    },
+    "thermal": {
+      "type": "Camera",
+      "backend": "v4l2",
+      "device_id": 2,
+      "device_node": "/dev/video2",
+      "exists": true,
+      "video_format": "YUY2",
+      "is_opened": true,
+      "properties": {
+        "width": 256,
+        "height": 384,
+        "fps": 25.0,
+        "fourcc": {
+          "int": 1448695129,
+          "str": "YUYV"
+        }
+      },
+      "ir_raw_shape": [
+        192,
+        256
+      ],
+      "ir_raw_dtype": "uint16",
+      "conversion": "temp_c = raw/64.0 - 273.15",
+      "display_scale": 2.5,
+      "display_size": [
+        480,
+        640
+      ],
+      "render_mode": "thermal_only",
+      "norm_mode": "fixed",
+      "fixed_tmin_c": 10.0,
+      "fixed_tmax_c": 30.0,
+      "blend_alpha": 0.75,
+      "colormap": "INFERNO"
+    }
+  },
+  "adc": {
+    "type": "ADC",
+    "i2c": {
+      "linux_bus_id": 7,
+      "device_nodes": [
+        "/dev/i2c-7",
+        "/sys/bus/i2c/devices/i2c-7"
+      ],
+      "owns_bus_handle": true
+    },
+    "devices": [
+      {
+        "type": "ADS1115",
+        "address_hex": "0x48",
+        "address_int": 72,
+        "i2c": {
+          "linux_bus_id": 7,
+          "device_node": "/dev/i2c-7",
+          "owns_bus_handle": false
+        },
+        "configuration_intent": {
+          "mode": "single-shot",
+          "inputs": "AINx vs GND (single-ended)",
+          "pga_full_scale_v": 4.096,
+          "data_rate_sps": 860,
+          "comparator": "disabled",
+          "note": "These reflect what read()/read4_once() program into config reg (0x01)."
+        },
+        "channels": [
+          {
+            "channel": 0,
+            "mux_bits": "100",
+            "signal": "AIN0-GND",
+            "name": "MQ-4 (CH4)"
+          },
+          {
+            "channel": 1,
+            "mux_bits": "101",
+            "signal": "AIN1-GND",
+            "name": "MQ-7 (CO)"
+          },
+          {
+            "channel": 2,
+            "mux_bits": "110",
+            "signal": "AIN2-GND",
+            "name": "MQ-138 (VOCs)"
+          },
+          {
+            "channel": 3,
+            "mux_bits": "111",
+            "signal": "AIN3-GND",
+            "name": "KY-026 Flame"
+          }
+        ],
+        "raw_output": {
+          "type": "int16",
+          "two_complement": true,
+          "expected_max_raw_at_vcc_3v3": 26400
+        }
+      },
+      {
+        "type": "ADS1115",
+        "address_hex": "0x49",
+        "address_int": 73,
+        "i2c": {
+          "linux_bus_id": 7,
+          "device_node": "/dev/i2c-7",
+          "owns_bus_handle": false
+        },
+        "configuration_intent": {
+          "mode": "single-shot",
+          "inputs": "AINx vs GND (single-ended)",
+          "pga_full_scale_v": 4.096,
+          "data_rate_sps": 860,
+          "comparator": "disabled",
+          "note": "These reflect what read()/read4_once() program into config reg (0x01)."
+        },
+        "channels": [
+          {
+            "channel": 0,
+            "mux_bits": "100",
+            "signal": "AIN0-GND",
+            "name": "MiCS-6814 NO2"
+          },
+          {
+            "channel": 1,
+            "mux_bits": "101",
+            "signal": "AIN1-GND",
+            "name": "MiCS-6814 NH3"
+          },
+          {
+            "channel": 2,
+            "mux_bits": "110",
+            "signal": "AIN2-GND",
+            "name": "MiCS-6814 CO"
+          },
+          {
+            "channel": 3,
+            "mux_bits": "111",
+            "signal": "AIN3-GND",
+            "name": "0x49_A3"
+          }
+        ],
+        "raw_output": {
+          "type": "int16",
+          "two_complement": true,
+          "expected_max_raw_at_vcc_3v3": 26400
+        }
+      }
+    ],
+    "notes": [
+      "Jetson I2C1 commonly appears as Linux i2c-7 depending on device tree / pins used."
+    ]
+  },
+  "ir_raw_writer": {
+    "fps_target": 25.0,
+    "ir_data": {
+      "raw_shape": [
+        192,
+        256
+      ],
+      "raw_dtype": "uint16",
+      "conversion": "temp_c = raw/64.0 - 273.15",
+      "colormap": "INFERNO",
+      "display_scale": 2.5
+    },
+    "ir_npz": {
+      "chunk_frames": 250,
+      "dir": "ir_raw",
+      "pattern": "ir_raw_%06d_%06d.npz",
+      "arrays": [
+        "frame_idx",
+        "t_sample",
+        "ir_raw16"
+      ]
+    }
+  },
+  "temp_and_humidity": {
+    "type": "Temperature and Humidity Sensor",
+    "i2c": {
+      "linux_bus_id": "shared bus with another device",
+      "device_address": 68,
+      "owns_bus_handle": false
+    },
+    "devices": [
+      "HDC3022"
+    ],
+    "notes": [
+      "Jetson I2C1 commonly appears as Linux i2c-7 depending on device tree / pins used.",
+      "Units: Temperature in degrees C, Humidity in percent"
+    ]
+  },
+  "uart": {
+    "sen0219": {
+      "sensor": "SEN0219",
+      "gas": "CO2",
+      "iface": "uart",
+      "port": "/dev/ttyUSB0",
+      "baud": 9600,
+      "timeout_s": 0.25,
+      "inter_cmd_delay_s": 0.02,
+      "protocol": "MH-Z/0x86-like",
+      "units": "ppm",
+      "ppm_min": 200,
+      "ppm_max": 100000
+    },
+    "ze07-co": {
+      "sensor": "ZE07-CO",
+      "gas": "CO",
+      "iface": "uart",
+      "port": "/dev/ttyTHS1",
+      "baud": 9600,
+      "timeout_s": 0.25,
+      "inter_cmd_delay_s": 0.02,
+      "mode": "qa",
+      "protocol": "Winsen 9-byte",
+      "units": "ppm",
+      "resolution_ppm": 0.1,
+      "ppm_min": 0.0,
+      "ppm_max": 5000.0
+    }
+  }
+}
