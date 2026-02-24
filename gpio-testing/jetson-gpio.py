@@ -9,9 +9,9 @@ GPIO.setup(PIN, GPIO.OUT, initial=GPIO.LOW)
 try:
     while True:
         GPIO.output(PIN, GPIO.HIGH)
-        time.sleep(0.5)
+        time.sleep(5)
         GPIO.output(PIN, GPIO.LOW)
-        time.sleep(0.5)
+        time.sleep(5)
 
 except KeyboardInterrupt:
     pass

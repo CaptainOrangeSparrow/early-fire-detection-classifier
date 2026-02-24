@@ -1,0 +1,10 @@
+(recording) firedistinguisher@jetsonnano:~/projects/early-fire-detection-classifier/gpio-testing$ sudo -E /home/firedistinguisher/miniconda3/envs/recording/bin/python jetson-gpio.py
+/home/firedistinguisher/miniconda3/envs/recording/lib/python3.10/site-packages/Jetson/GPIO/gpio_cdev.py:361: UserWarning:
+[WARNING] User requested output for channel "15", but it is set to input in pinmux. For more information on resolving this, please see
+https://docs.nvidia.com/jetson/archives/r36.3/DeveloperGuide/HR/JetsonModuleAdaptationAndBringUp/JetsonOrinNxNanoSeries.html#generating-the-pinmux-dtsi-files
+
+This can be resolved *temporarily* (until next restart) by running:
+    sudo busybox devmem 0x2440020 w 0x5
+
+  warnings.warn(
+
