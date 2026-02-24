@@ -285,7 +285,8 @@ class ZE07CO(UARTDevice):
         ppm = conc_raw * 0.1
 
         if not (self.ppm_min <= ppm <= self.ppm_max):
-            return None
+            print("CO Sample out of range!! ppm=", ppm)
+            #return None
 
         repeated = (self._last_ppm == ppm)
         self._last_ppm = ppm

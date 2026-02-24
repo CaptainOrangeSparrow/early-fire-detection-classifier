@@ -19,7 +19,7 @@ class ADC:
             self._owns_bus = False
         
         adc0 = ADS1115(0x48, self.i2c_bus)
-        adc1 = ADS1115(0x49, self.i2c_bus)
+        adc1 = ADS1115(0x49, self.i2c_bus, pga=1) # pga 1 = normal, pga = 4 scaled
         self.ads1115_list = [adc0, adc1]
     
     def get_i2c_bus(self):
@@ -69,7 +69,7 @@ class ADS1115:
     PGA_FS_V = 4.096 # Voltage Scaling (Set by the 0xE3 command)
     DATA_RATE_SPS = 860 # Data rate also set by 0xE3 command
 
-    def __init__(self, device_address=0x48, i2c_bus=None, bus_id=DEFAULT_I2C_BUS):
+    def __init__(self, device_address=0x48, i2c_bus=None, bus_id=DEFAULT_I2C_BUS, pga=1):
         self.bus_id = bus_id
         if i2c_bus == None:
             self.i2c_bus = SMBus(bus_id)
@@ -80,6 +80,8 @@ class ADS1115:
 
         self.device_address = device_address
         self.channel_names = [hex(device_address)+"_A0", hex(device_address)+"_A1", hex(device_address)+"_A2", hex(device_address)+"_A3"]
+        
+        self.pga = pga
 
     def get_i2c_bus(self):
         return self.i2c_bus
@@ -89,12 +91,21 @@ class ADS1115:
         # Control reg mapping:
         # [15] = trigger read
         # [14:12] = adc channel (see datasheet)
+        # [11:9] = PGA Gain
         # [7:5] = data rate (set this to 111 for 860 sps (fast))
         # Im too lazy to copy these - just see datasheet for ADS1115
         # But basically we need b11xx001111100011 for the write to the control reg where xx is the adc channel
 
+        # PGA Gain:
+        # 0 = 6.144V
+        # 1 = 4.096V
+        # 2 = 2.048V
+        # 3 = 1.024V
+        # 4 = 0.512V
+        # 5 = 0.256V
+
         # Config register: single-shot, AIN0-3 vs GND, gain=1, 128SPS
-        cmd = 0x83 | (int(adc_channel + 4) << 4) # shift 12, but since high byte, shift by 4
+        cmd = 0x81 | ((self.pga & 0x7) << 1) | (int(adc_channel + 4) << 4) # shift 12, but since high byte, shift by 4
 
         #reg 0x00 is data reg, reg 0x01 is control reg
         self.i2c_bus.write_i2c_block_data(self.device_address, 0x01, [cmd, 0xE3])
@@ -106,7 +117,8 @@ class ADS1115:
             raw -= 0x10000 # value is signed two's complement
 
         #voltage = raw * 4.096 / 32767.0 # convert to voltage if desired
-        
+        #^assuming pga=1 (4.096)
+
         # Note, max raw value is 32767 taking into account two's complement
         # However, we are using PGA scale set to 4.096V, which means Ain of 4.096V = 32767.
         # Since our VCC will be 3.3V, the max ADC value we expect is 26400 or 26399.
@@ -132,7 +144,7 @@ class ADS1115:
     def read4_once(self, discard_first=True):
         vals = []
         for ch in (0, 1, 2, 3):
-            high = 0x83 | ((ch + 4) << 4)
+            high = 0x81 | ((self.pga & 0x7) << 1) | ((ch + 4) << 4)
 
             # start conversion
             self.i2c_bus.write_i2c_block_data(self.device_address, 0x01, [high, 0xE3])
