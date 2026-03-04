@@ -9,9 +9,11 @@ import cv2
 import numpy as np
 from enum import Enum
 
+from peripherals.gst_tools.gst_capture import GstRgbCapture, GstIrCaptureRawYuy2
+
 class Camera():
 
-    def __init__(self, device_id, use_gstreamer=False, gst_pipeline=None, video_format="MJPG"):
+    def __init__(self, device_id, use_gstreamer=False, gst_tee=False, gst_pipeline=None, gst_record_path=None, width=640, height=480, fps=30, video_format="MJPG"):
 
         self._current_frame = None
         self._device_id = device_id
@@ -19,32 +21,95 @@ class Camera():
         self._gst_pipeline = gst_pipeline
         self._video_format = video_format
 
+        self._backend = None
+        self._cap = None
+        self._gst = None
+        self._gst_last_pts_ns = None
+
         if use_gstreamer:
+            '''
             if gst_pipeline is None:
                 print("Using Default-Custom-Defined Gstreamer Pipeline...")
-                gst_pipeline = self.gst_pipeline(self._device_id, 1280, 720, 30) #1MP, 720p
+                #gst_pipeline = self.gst_pipeline(self._device_id, 1280, 720, 30) #1MP, 720p
+                gst_pipeline = self.gst_pipeline(self._device_id, 640, 480, 30)
+            #self._cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
+            '''
+            # We will not use cv2 for gstreamer, as the current cv2 build does not support gstreamer. Instead we will use gi.
+            
+            self._gst = self._build_gst_backend(
+                device_id=device_id,
+                gst_tee=gst_tee,
+                gst_record_path=gst_record_path,
+                gst_bitrate = int(8000000),
+                width=width,
+                height=height,
+                fps=fps,
+            )
+            self._gst.start()
+            self._backend = "gst_gi"
 
-            self._cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
         else:
             self._cap = cv2.VideoCapture(device_id, cv2.CAP_V4L2)
             self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*video_format))
+            self._backend = "opencv_v4l2"
 
-        if not self._cap.isOpened():
-            print("Gstreamer pipeline:", gst_pipeline)
-            raise RuntimeError("Error: Could not open camera device=" + str(self._device_id))
+            if not self._cap.isOpened():
+                #print("Gstreamer pipeline:", gst_pipeline)
+                raise RuntimeError("Error: Could not open camera device=" + str(self._device_id))
+
+    def _build_gst_backend(self, *, device_id, gst_tee, gst_record_path, gst_bitrate, width, height, fps):
+        """
+        Virtual hook: subclasses override to provide the right GStreamer capture backend.
+        Base class default: RGB MJPG -> nvjpegdec -> appsink, optional tee-record.
+        """
+        dev = f"/dev/video{device_id}" if isinstance(device_id, int) else str(device_id)
+        if gst_tee and not gst_record_path:
+            raise ValueError("gst_tee=True requires gst_record_path")
+        return GstRgbCapture(
+            device=dev, w=width, h=height, fps=fps,
+            tee=bool(gst_tee),
+            out_mp4=gst_record_path if gst_tee else None,
+            bitrate=int(gst_bitrate),
+        )
+
+    def is_opened(self):
+        if self._backend == "gst_gi":
+            return self._gst is not None
+        return self._cap is not None and self._cap.isOpened()
 
     def get_latest_frame(self):
         return self._current_frame
 
+    def get_latest_pts_ns(self):
+        """Optional convenience for sync/debugging."""
+        return self._gst_last_pts_ns
+
     def update_frames(self):
-        ret, frame = self._cap.read()
-        if not ret:
-            print("Error: Could not read frame from camera device=" + str(self._device_id))
-            return
+        # GStreamer
+        if self._backend == "gst_gi":
+            frame, pts_ns = self._gst.get_latest()
+            if frame is not None:
+                self._gst_last_pts_ns = pts_ns
+            else:
+                #print("Error rgb gst_gi frame is None")
+                return
+        else:
+            # OpenCV V4L2
+            ret, frame = self._cap.read()
+            if not ret:
+                print("Error: Could not read frame from camera device=" + str(self._device_id))
+                return
         self._current_frame = frame
 
     def close(self):
-        self._cap.release()
+        # stop GST
+        if self._backend == "gst_gi" and self._gst is not None:
+            self._gst.stop()
+            self._gst = None
+        # Release OpenCV cap object
+        if self._cap is not None:
+            self._cap.release()
+            self._cap = None
    
     @staticmethod
     def fourcc_int_to_str(fourcc):
@@ -54,7 +119,6 @@ class Camera():
         """
         Return a JSON-serializable dict describing this camera instance.
         """
-        fourcc_int = int(self._cap.get(cv2.CAP_PROP_FOURCC))
         info = {
             "type": "Camera",
             "backend": "gstreamer" if self._use_gstreamer else "v4l2",
@@ -62,8 +126,16 @@ class Camera():
             "device_node": f"/dev/video{self._device_id}" if isinstance(self._device_id, int) else str(self._device_id),
             "exists": os.path.exists(f"/dev/video{self._device_id}") if isinstance(self._device_id, int) else None,
             "video_format": self._video_format if not self._use_gstreamer else "from_pipeline",
-            "is_opened": bool(self._cap.isOpened()),
-            "properties": {
+            "is_opened": bool(self.is_opened()),
+        }
+
+        if self._use_gstreamer:
+            info["gstreamer"] = {
+                "pipeline": self._gst_pipeline
+            }
+        else:
+            fourcc_int = int(self._cap.get(cv2.CAP_PROP_FOURCC))
+            info["properties"] = {
                 "width": int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
                 "height": int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
                 "fps": float(self._cap.get(cv2.CAP_PROP_FPS)),
@@ -72,13 +144,6 @@ class Camera():
                     "str": Camera.fourcc_int_to_str(fourcc_int)
                 },
             }
-        }
-
-        if self._use_gstreamer:
-            info["gstreamer"] = {
-                "pipeline": self._gst_pipeline
-            }
-
         return info
 
     @staticmethod
@@ -133,14 +198,15 @@ class IRCamera(Camera):
         FIXED = "fixed"                  # fixed temp window
 
 
-    def __init__(self, device_id, colormap: "IRCamera.ColorMap", use_gstreamer=False, gst_pipeline=None, video_format="YUY2", norm_settings=("minmax", 80.0, 10.0)):
+    def __init__(self, device_id, colormap: "IRCamera.ColorMap", use_gstreamer=False, gst_tee=False, gst_pipeline=None, gst_record_path=None, video_format="YUY2", norm_settings=("minmax", 80.0, 10.0)):
         if use_gstreamer and gst_pipeline is None:
             print("Using Default-Custom-Defined IR GStreamer Pipeline...")
             gst_pipeline = self.gst_pipeline(device_id, 256, 384, 25) #256x192 with 2x height due to two frames
-        super().__init__(device_id, use_gstreamer=use_gstreamer, gst_pipeline=gst_pipeline, video_format=video_format)
+        super().__init__(device_id, use_gstreamer=use_gstreamer, gst_tee=gst_tee, gst_pipeline=gst_pipeline, gst_record_path=gst_record_path, width=256, height=384, fps=25, video_format=video_format)
         self._colormap = IRCamera.COLORMAPS_LIST[colormap.value]
         self.colormap_name = colormap.name
-        self._cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
+        if self._backend == "opencv_v4l2":
+            self._cap.set(cv2.CAP_PROP_CONVERT_RGB, 0)
 
         norm_mode, norm_max, norm_min = norm_settings
         if norm_mode.lower() == "minmax":
@@ -160,6 +226,17 @@ class IRCamera(Camera):
         self.sat_below = 0.0
         #only ussed if render_mode = BLEND
         self.blend_alpha = 0.75
+
+    def _build_gst_backend(self, *, device_id, gst_tee, gst_record_path, gst_bitrate, width, height, fps):
+        # Ignore RGB-specific parameters; IR capture is fixed-format for your device.
+        dev = f"/dev/video{device_id}" if isinstance(device_id, int) else str(device_id)
+        return GstIrCaptureRawYuy2(
+            device=dev,
+            w=256,
+            h=384,
+            fps=25,
+            drop=True
+        )
 
     def _thermal_colormap_bgr(self) -> "np.ndarray":
         raw = self._raw_thermal_frame  # (192,256) uint16
@@ -181,10 +258,16 @@ class IRCamera(Camera):
 
 
     def update_frames(self):
-        ret, frame = self._cap.read()
-        if not ret:
-            print("Error: Could not read frame from IR camera device=" + str(self._device_id))
-            return
+        if self._backend == "gst_gi":
+            frame, pts_ns = self._gst.get_latest()
+            if frame is None:
+                #print("Error: ir gst_gi frame is None")
+                return
+        else:
+            ret, frame = self._cap.read()
+            if not ret:
+                print("Error: Could not read frame from IR camera device=" + str(self._device_id))
+                return
         
         # Convert raw IR data to color-mapped image
         imdata,thdata = np.array_split(frame, 2)
