@@ -32,7 +32,9 @@ from utilities.fps_tracker import FPSTracker
 from utilities.key_handler import TerminalKeyWatcher, poll_quit_key
 from utilities.web_preview import WebPreviewServer, generate_colorbar_png
 from utilities.single_instance import SingleInstance
-from utilities.ir_raw_writer import IrRawChunkWriter, IRMeta
+#from utilities.ir_raw_writer import IrRawChunkWriter, IRMeta
+from utilities.ir_raw_writer_buffered import IRMeta
+from utilities.ir_raw_writer_buffered import IrRawChunkWriterDoubleBuffer as IrRawChunkWriter
 
 # ----------------------------
 # Thread-safe “latest value” holders
