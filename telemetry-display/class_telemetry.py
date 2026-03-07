@@ -3,6 +3,7 @@ from state_telemetry import *
 import time
 from MultiViewDisplay import MultiViewDisplay
 import Jetson.GPIO as GPIO
+import threading
 
 feature = type('feature', (object,), {})  # Simple feature class for demonstration
 
@@ -11,13 +12,14 @@ class Telemetry(feature):
         self.FSM = FSM(self, debug=True)
         try:
             self.display = MultiViewDisplay()
-            self.display.run(target_fps=10, live =True)
+            self.display_thread = threading.Thread(target=self.display.run, kwargs={'target_fps':10, 'live':True}, daemon=True)
+            self.display_thread.start()
         except Exception as e:
             print(f"Error: {e}")
             import traceback
             traceback.print_exc()
         
-        self.button = 9  # GPIO pin for button input
+        self.button = 7  # GPIO pin for button input
         self.button_held = False
         self.press_start_time = None
         
@@ -35,10 +37,14 @@ class Telemetry(feature):
     def execute(self):
         self.FSM.execute()  # Execute the FSM logic without packet data
 
-    def on_press(self, channel):
+    def on_press(self):
+        if self.FSM.debug:
+            print("Button Pressed")
         self.press_start_time = time.time()  # Start timing when button is first pressed
     
-    def on_release(self, channel):
+    def on_release(self):
+        if self.FSM.debug:
+            print("Button Released")
         duration = time.time() - self.press_start_time if self.press_start_time else 0
         self.press_start_time = None  # Reset timing on release
         if duration >= 3:  # Check if button was held for 3 seconds
@@ -46,8 +52,13 @@ class Telemetry(feature):
         else:
             self.button_held = False
 
+    def button_callback(self, channel):
+        if GPIO.input(channel) == GPIO.HIGH:
+            self.on_press()
+        else:
+            self.on_release()
+
     def _initButton(self, pin=9):
         GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-        GPIO.add_event_detect(pin, GPIO.RISING, callback=self.on_press, bouncetime=50)
-        GPIO.add_event_detect(pin, GPIO.FALLING, callback=self.on_release, bouncetime=50)
+        GPIO.setup(pin, GPIO.IN)
+        GPIO.add_event_detect(pin, GPIO.BOTH, callback=self.button_callback, bouncetime=50)

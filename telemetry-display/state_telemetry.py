@@ -88,7 +88,7 @@ class IRState(State):
 class GasState(State):
     def __init__(self, FSM):
         super(GasState, self).__init__(FSM)
-        self.addTransition('toMultiViewState', transition('toMultiViewState', condition=self.wasHeld, debug=self.FSM.debug))
+        self.addTransition('toMultiViewState', transition('MultiViewState', condition=self.wasHeld, debug=self.FSM.debug))
         
     def enter(self):
         if self.FSM.debug:

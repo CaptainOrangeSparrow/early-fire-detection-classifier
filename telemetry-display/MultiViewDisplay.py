@@ -1,3 +1,5 @@
+import threading
+
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -11,6 +13,7 @@ from io import BytesIO
 import random
 import cameras as cm
 from adc import ADC
+import threading
 
 class LiveGraph:
     # Handles real-time graph generation
@@ -31,7 +34,6 @@ class LiveGraph:
         self.adc.set_adc_channel_names(0, adc0_names)
         self.adc.set_adc_channel_names(1, adc1_names)
 
-        # Build flat list of (adc_index, channel_index, label) for non-None channels
         self.channels = []
         for ch_idx, name in enumerate(adc0_names):
             if name is not None:
@@ -40,11 +42,111 @@ class LiveGraph:
             if name is not None:
                 self.channels.append((1, ch_idx, name))
 
-        # One deque per active channel, keyed by (adc_index, channel_index)
         self.data = {
             (adc_i, ch_i): deque(maxlen=max_points)
             for adc_i, ch_i, _ in self.channels
         }
+
+        self.lines = {}
+        for color, (adc_i, ch_i, label) in zip(self.CHANNEL_COLORS, self.channels):
+            line, = self.ax.plot([], [], color=color, linewidth=0.8, label=label)
+            self.lines[(adc_i, ch_i)] = line
+
+        self.ax.tick_params(colors='white', labelsize=6)
+        self.ax.grid(True, alpha=0.3, color='white')
+        self.ax.set_xlabel('Time', color='white', fontsize=6)
+        self.ax.set_ylabel('Gas PPM', color='white', fontsize=6)
+        self.ax.legend(
+            loc='upper left', fontsize=4, framealpha=0.3,
+            facecolor='black', edgecolor='white', labelcolor='white', ncol=2
+        )
+
+        self._latest_frame = Image.new('RGB', self.frame_size, color=(0, 0, 0))
+        self._frame_lock = threading.Lock()
+        self._stop = threading.Event()
+
+        self._sensor_thread = threading.Thread(target=self._sensor_loop, daemon=True)
+        self._sensor_thread.start()
+
+        self._render_thread = threading.Thread(target=self._render_loop, daemon=True)
+        self._render_thread.start()
+
+    def _capture_loop(self):
+        while not self._stop.is_set():
+            try:
+                self.video.update_frames()
+                frame = self.video.get_latest_frame()
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(frame_rgb).resize(self.frame_size, Image.BILINEAR)
+                with self._frame_lock:
+                    self._latest_frame = img
+            except Exception as e:
+                print(f"Camera error: {e}")
+            time.sleep(0.033)  # ~30hz cap
+
+    def get_frame(self):
+        with self._frame_lock:
+            return self._latest_frame
+
+    def release(self):
+        self._stop.set()
+        self.video.close()
+
+
+    def _sensor_loop(self):
+        """I2C reads are slow (~50ms), no need to spin"""
+        while not self._stop.is_set():
+            try:
+                values = self.read_sensor()
+                self.add_data(values)
+            except Exception as e:
+                print(f"Sensor read error: {e}")
+            time.sleep(0.05)  # ~20hz, matches ADC speed
+
+    def _render_loop(self):
+        """Only re-render when new data actually arrived"""
+        last_render = 0
+        while not self._stop.is_set():
+            now = time.perf_counter()
+            if now - last_render >= (1/10):  # cap at 10fps render rate
+                img = self._render_frame()
+                with self._frame_lock:
+                    self._latest_frame = img
+                last_render = now
+            else:
+                time.sleep(0.005)  # yield GIL while waiting
+
+    def _render_frame(self):
+        has_data = any(len(d) > 0 for d in self.data.values())
+        if has_data:
+            all_values = []
+            max_len = 0
+            for (adc_i, ch_i), line in self.lines.items():
+                series = list(self.data[(adc_i, ch_i)])
+                line.set_data(range(len(series)), series)
+                all_values.extend(series)
+                max_len = max(max_len, len(series))
+
+            data_min, data_max = min(all_values), max(all_values)
+            padding = (data_max - data_min) * 0.1 or 1
+            self.ax.set_xlim(0, max(max_len, 10))
+            self.ax.set_ylim(data_min - padding, data_max + padding)
+
+        self.fig.canvas.draw()
+        buf = np.frombuffer(self.fig.canvas.buffer_rgba(), dtype=np.uint8)
+        buf = buf.reshape(self.fig.canvas.get_width_height()[::-1] + (4,))
+        return Image.fromarray(buf, mode='RGBA').convert('RGB').resize(
+            self.frame_size, Image.BILINEAR  # BILINEAR is faster than LANCZOS
+        )
+
+    def get_graph_image(self):
+        """MultiViewDisplay calls this — just returns latest pre-rendered frame"""
+        with self._frame_lock:
+            return self._latest_frame
+
+    def stop(self):
+        self._stop.set()
+
 
     def read_sensor(self):
         adc0_values = self.adc.read4_once(0)
@@ -67,52 +169,7 @@ class LiveGraph:
 
         for adc_i, ch_i, _ in self.channels:
             self.data[(adc_i, ch_i)].append(src[adc_i][ch_i])
-
-    def get_graph_image(self):
-        self.ax.clear()
-
-        has_data = any(len(d) > 0 for d in self.data.values())
-        if has_data:
-            for color, (adc_i, ch_i, label) in zip(self.CHANNEL_COLORS, self.channels):
-                series = list(self.data[(adc_i, ch_i)])
-                if series:
-                    self.ax.plot(series, color=color, linewidth=0.8, label=label)
-
-            max_len = max(len(d) for d in self.data.values())
-            self.ax.set_xlim(0, max(max_len, 10))
-
-            # Dynamic y limits with 10% padding
-            all_values = [v for d in self.data.values() for v in d]
-            data_min, data_max = min(all_values), max(all_values)
-            padding = (data_max - data_min) * 0.1 or 1  # fallback if all values are equal
-            self.ax.set_ylim(data_min - padding, data_max + padding)
-
-            self.ax.tick_params(colors='white', labelsize=6)
-            self.ax.grid(True, alpha=0.3, color='white')
-            self.ax.set_xlabel('Time', color='white', fontsize=6)
-            self.ax.set_ylabel('Gas PPM', color='white', fontsize=6)
-
-            self.ax.legend(
-                loc='upper left',
-                fontsize=4,
-                framealpha=0.3,
-                facecolor='black',
-                edgecolor='white',
-                labelcolor='white',
-                ncol=2
-            )
-
-        buf = BytesIO()
-        plt.savefig(buf, format='png', bbox_inches='tight',
-                    facecolor='black', edgecolor='none', dpi=100)
-        buf.seek(0)
-
-        img = Image.open(buf)
-        img = img.resize(self.frame_size, Image.LANCZOS)
-        buf.close()
-
-        return img
-
+    
 class VideoFeed:
     """Handles video frame extraction and resizing"""
     def __init__(self, video_type=None, target_size=(64, 80)):
@@ -124,10 +181,14 @@ class VideoFeed:
             raise ValueError(f"Current 'video_type': {video_type} - Specify either: IR, RGB")
 
         self.target_size = target_size
-    
+        
     def set_frame_size(self, size):
         if size is not None and isinstance(size, tuple) and len(size) == 2:
-            self.target_size = size
+            self.frame_size = size
+            self.fig.set_size_inches(tuple(ti/100 for ti in self.frame_size))
+            # Force render thread to redraw at new size immediately
+            with self._frame_lock:
+                self._latest_frame = None
         
     def get_frame(self):
         """Get next frame as PIL Image"""
@@ -200,44 +261,49 @@ class MultiViewDisplay:
         canvas.paste(ir_frame, (64, 0))
         
         # Add sensor data and get graph
-        sensor_value = self.simulate_sensor_reading()
-        self.graph.add_data(sensor_value)
         graph_img = self.graph.get_graph_image()
         canvas.paste(graph_img, (0, 80))
         
         return canvas
-    
+        
     def set_view(self, view_name):
-        # Change current view (not fully implemented in this example)
         if view_name in self.view_names:
             self.current_view = view_name
+            
+            # Clear display to black to prevent ghosting from previous view
+            blank = Image.new('RGB', (128, 160), color=(0, 0, 0))
+            self.disp.display(blank)
+            
             if self.current_view == "MultiView":
                 self.camera_feed.set_frame_size((64, 80))
                 self.ir_feed.set_frame_size((64, 80))
                 self.graph.set_frame_size((128, 80))
-                
             elif self.current_view == "RGB":
                 self.camera_feed.set_frame_size((128, 160))
-                
             elif self.current_view == "IR":
                 self.ir_feed.set_frame_size((128, 160))
-                
             elif self.current_view == "Gas":
                 self.graph.set_frame_size((128, 160))
-                
-            print(f"Switched to view: {view_name}")
-        else:
-            print(f"Invalid view: {view_name}")
-      
+                        
     def get_current_view_frame(self):
+        FULL = (128, 160)
+        
         if self.current_view == "MultiView":
             return self.create_composite_frame()
+        
         elif self.current_view == "RGB":
-            return self.camera_feed.get_frame()
+            frame = self.camera_feed.get_frame()
+            return frame.resize(FULL, Image.BILINEAR) if frame.size != FULL else frame
+        
         elif self.current_view == "IR":
-            return self.ir_feed.get_frame()
+            frame = self.ir_feed.get_frame()
+            return frame.resize(FULL, Image.BILINEAR) if frame.size != FULL else frame
+        
         elif self.current_view == "Gas":
-            return self.graph.get_graph_image()
+            frame = self.graph.get_graph_image()
+            if frame is None:
+                return Image.new('RGB', FULL, color=(0, 0, 0))  # blank while loading
+            return frame.resize(FULL, Image.BILINEAR) if frame.size != FULL else frame
 
     def run(self, target_fps=10, duration=60, live=True):
         # Main display loop
@@ -289,3 +355,12 @@ class MultiViewDisplay:
         avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
         print(f"Total frames: {self.frame_count}")
         print(f"Average FPS: {avg_fps:.2f}")
+
+# if __name__ == "__main__":
+#     try:
+#             display = MultiViewDisplay()
+#             display.run(target_fps=10, live=True)
+#     except Exception as e:
+#         print(f"Error: {e}")
+#         import traceback
+#         traceback.print_exc()
