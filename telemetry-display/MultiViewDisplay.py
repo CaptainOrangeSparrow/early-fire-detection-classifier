@@ -10,44 +10,107 @@ import matplotlib.pyplot as plt
 from io import BytesIO
 import random
 import cameras as cm
-import adc
+from adc import ADC
 
 class LiveGraph:
     # Handles real-time graph generation
-    def __init__(self, max_points=50):
-        self.data = deque(maxlen=max_points)
-        self.fig, self.ax = plt.subplots(figsize=(1.28, 0.8), dpi=100)
+    CHANNEL_COLORS = [
+        '#00FFFF', '#FF6B6B', '#98FB98', '#FFD700',
+        '#FF69B4', '#FFA500', '#7B68EE'
+    ]
+
+    def __init__(self, max_points=50, frame_size=(128, 80)):
+        self.frame_size = frame_size
+        self.fig, self.ax = plt.subplots(figsize=tuple(ti/100 for ti in self.frame_size), dpi=100)
         self.fig.patch.set_facecolor('black')
         self.ax.set_facecolor('black')
+        self.adc = ADC()
         
-    def add_data(self, value):
-        # Add new sensor reading
-        self.data.append(value)
-    
+        adc0_names = ["MQ-4 (CH4)", "MQ-7 (CO)", "MQ-138 (VOCs)", "KY-026 Flame"]
+        adc1_names = ["MiCS-6814 NO2", "MiCS-6814 NH3", "MiCS-6814 CO", None]
+        self.adc.set_adc_channel_names(0, adc0_names)
+        self.adc.set_adc_channel_names(1, adc1_names)
+
+        # Build flat list of (adc_index, channel_index, label) for non-None channels
+        self.channels = []
+        for ch_idx, name in enumerate(adc0_names):
+            if name is not None:
+                self.channels.append((0, ch_idx, name))
+        for ch_idx, name in enumerate(adc1_names):
+            if name is not None:
+                self.channels.append((1, ch_idx, name))
+
+        # One deque per active channel, keyed by (adc_index, channel_index)
+        self.data = {
+            (adc_i, ch_i): deque(maxlen=max_points)
+            for adc_i, ch_i, _ in self.channels
+        }
+
+    def read_sensor(self):
+        adc0_values = self.adc.read4_once(0)
+        adc1_values = self.adc.read4_once(1)
+        return adc0_values + adc1_values
+
+    def set_frame_size(self, size):
+        if size is not None and isinstance(size, tuple) and len(size) == 2:
+            self.frame_size = size
+            self.fig.set_size_inches(tuple(ti/100 for ti in self.frame_size))
+
+    def add_data(self, values):
+        """
+        values: flat list of 8 readings [adc0_ch0..3, adc1_ch0..3]
+        Only appends to deques for non-None channels.
+        """
+        adc0_vals = values[:4]
+        adc1_vals = values[4:]
+        src = {0: adc0_vals, 1: adc1_vals}
+
+        for adc_i, ch_i, _ in self.channels:
+            self.data[(adc_i, ch_i)].append(src[adc_i][ch_i])
+
     def get_graph_image(self):
-        # Generate graph as PIL Image
         self.ax.clear()
-        
-        if len(self.data) > 0:
-            self.ax.plot(list(self.data), color='#00FFFF', linewidth=0.8)
-            self.ax.set_xlim(0, max(len(self.data), 10))
-            self.ax.set_ylim(0, 100)
+
+        has_data = any(len(d) > 0 for d in self.data.values())
+        if has_data:
+            for color, (adc_i, ch_i, label) in zip(self.CHANNEL_COLORS, self.channels):
+                series = list(self.data[(adc_i, ch_i)])
+                if series:
+                    self.ax.plot(series, color=color, linewidth=0.8, label=label)
+
+            max_len = max(len(d) for d in self.data.values())
+            self.ax.set_xlim(0, max(max_len, 10))
+
+            # Dynamic y limits with 10% padding
+            all_values = [v for d in self.data.values() for v in d]
+            data_min, data_max = min(all_values), max(all_values)
+            padding = (data_max - data_min) * 0.1 or 1  # fallback if all values are equal
+            self.ax.set_ylim(data_min - padding, data_max + padding)
+
             self.ax.tick_params(colors='white', labelsize=6)
             self.ax.grid(True, alpha=0.3, color='white')
             self.ax.set_xlabel('Time', color='white', fontsize=6)
             self.ax.set_ylabel('Gas PPM', color='white', fontsize=6)
-        
-        # Save to buffer
+
+            self.ax.legend(
+                loc='upper left',
+                fontsize=4,
+                framealpha=0.3,
+                facecolor='black',
+                edgecolor='white',
+                labelcolor='white',
+                ncol=2
+            )
+
         buf = BytesIO()
-        plt.savefig(buf, format='png', bbox_inches='tight', 
+        plt.savefig(buf, format='png', bbox_inches='tight',
                     facecolor='black', edgecolor='none', dpi=100)
         buf.seek(0)
-        
-        # Convert to PIL and resize
+
         img = Image.open(buf)
-        img = img.resize((128, 80), Image.LANCZOS)
+        img = img.resize(self.frame_size, Image.LANCZOS)
         buf.close()
-        
+
         return img
 
 class VideoFeed:
@@ -61,6 +124,10 @@ class VideoFeed:
             raise ValueError(f"Current 'video_type': {video_type} - Specify either: IR, RGB")
 
         self.target_size = target_size
+    
+    def set_frame_size(self, size):
+        if size is not None and isinstance(size, tuple) and len(size) == 2:
+            self.target_size = size
         
     def get_frame(self):
         """Get next frame as PIL Image"""
@@ -98,13 +165,15 @@ class MultiViewDisplay:
             offset_top=0,
             spi_speed_hz=16_000_000  # 32 MHz
         )
+        self.current_view = "MultiView"
+        self.view_names = ["MultiView", "RGB", "IR", "Gas"]
         
         # Initialize video feeds
         self.camera_feed = VideoFeed(video_type="RGB", target_size=(64, 80))
         self.ir_feed = VideoFeed(video_type="IR", target_size=(64, 80))
         
         # Initialize graph
-        self.graph = LiveGraph(max_points=50)
+        self.graph = LiveGraph(max_points=50, frame_size=(128, 80))
         
         # Performance tracking
         self.frame_count = 0
@@ -138,6 +207,38 @@ class MultiViewDisplay:
         
         return canvas
     
+    def set_view(self, view_name):
+        # Change current view (not fully implemented in this example)
+        if view_name in self.view_names:
+            self.current_view = view_name
+            if self.current_view == "MultiView":
+                self.camera_feed.set_frame_size((64, 80))
+                self.ir_feed.set_frame_size((64, 80))
+                self.graph.set_frame_size((128, 80))
+                
+            elif self.current_view == "RGB":
+                self.camera_feed.set_frame_size((128, 160))
+                
+            elif self.current_view == "IR":
+                self.ir_feed.set_frame_size((128, 160))
+                
+            elif self.current_view == "Gas":
+                self.graph.set_frame_size((128, 160))
+                
+            print(f"Switched to view: {view_name}")
+        else:
+            print(f"Invalid view: {view_name}")
+      
+    def get_current_view_frame(self):
+        if self.current_view == "MultiView":
+            return self.create_composite_frame()
+        elif self.current_view == "RGB":
+            return self.camera_feed.get_frame()
+        elif self.current_view == "IR":
+            return self.ir_feed.get_frame()
+        elif self.current_view == "Gas":
+            return self.graph.get_graph_image()
+
     def run(self, target_fps=10, duration=60, live=True):
         # Main display loop
         frame_delay = 1.0 / target_fps
@@ -153,7 +254,7 @@ class MultiViewDisplay:
                 frame_start = time.time()
                 
                 # Create and display composite frame
-                frame = self.create_composite_frame()
+                frame = self.get_current_view_frame()
                 self.disp.display(frame)
                 
                 # Track performance
@@ -188,12 +289,3 @@ class MultiViewDisplay:
         avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
         print(f"Total frames: {self.frame_count}")
         print(f"Average FPS: {avg_fps:.2f}")
-
-if __name__ == "__main__":
-    try:
-        display = MultiViewDisplay()
-        display.run(target_fps=10, live=True)  # Run for 60 seconds at 10 FPS
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
