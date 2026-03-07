@@ -332,7 +332,7 @@ class IRCamera(Camera):
         
         if self.render_mode in [IRCamera.IRRenderMode.IMDATA_ONLY, IRCamera.IRRenderMode.BLEND]:
             # Need imdata image
-            # Convert the real image to RGB
+            # Convert the real image to BGR
             bgr_detail = cv2.cvtColor(imdata,  cv2.COLOR_YUV2BGR_YUYV)
             #Contrast
             bgr_detail = cv2.convertScaleAbs(bgr_detail, alpha=IRCamera.alpha)#Contrast
