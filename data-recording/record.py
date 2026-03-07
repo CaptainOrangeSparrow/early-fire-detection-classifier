@@ -313,7 +313,7 @@ class RecorderGUI(QWidget):
         self.stop_evt = threading.Event()
         
         # Cameras
-        self.reg_cam = Camera(reg_id, use_gstreamer=use_gstreamer, gst_tee=use_gst_tee, gst_record_path=os.path.join(self.run_dir, "regular.mp4"))
+        self.reg_cam = Camera(reg_id, use_gstreamer=use_gstreamer, gst_tee=use_gst_tee, gst_record_path=os.path.join(self.run_dir,"regular.mp4"))
         self.ir_cam = IRCamera(ir_id, ir_colormap, use_gstreamer=use_gstreamer, gst_tee=use_gst_tee, gst_record_path=os.path.join(self.run_dir, "ir.mp4"), norm_settings=ir_norm_settings)
 
         # ADC
@@ -721,7 +721,7 @@ def main():
         print("Another instance of this script is already running!\n")
         raise SystemExit(1)
 
-    run_dir = None if args.view_only else make_unique_dir(args.recordings_dir, args.name, args.fps)
+    run_dir = "/home/firedistinguisher/projects/early-fire-detection-classifier/data-recording/view-dummy-dir" if args.view_only else make_unique_dir(args.recordings_dir, args.name, args.fps)
     cmap = IRCamera.ColorMap[args.ir_colormap]
     generate_colorbar_png(os.path.join("utilities/static", "colorbar.png"), IRCamera.COLORMAPS_LIST[cmap.value], num_ticks=3)
 
