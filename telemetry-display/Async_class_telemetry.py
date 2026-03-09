@@ -11,20 +11,25 @@ import asyncio
 feature = type('feature', (object,), {})  # Simple feature class for demonstration
 
 class Telemetry(feature): 
-    def __init__(self):        
+    def __init__(self, auto_switch: float | int = None, stream: bool = False):        
         self.display: MultiViewDisplay = MultiViewDisplay(preview=False)
         
-        self.http_stream = HTTPStreamServer(self.display)
-        self.http_stream.start()
+        self.stream = stream
+        if self.stream:
+            self.http_stream = HTTPStreamServer(self.display)
+            self.http_stream.start()
         
         self.FSM: FSM = FSM(self, debug=True)
         
         self.button = 7  # GPIO pin for button input
         self.button_held = False
         self.press_start_time = None
-        
+        self.auto_switch = auto_switch
+
+
         self._initButton(pin=self.button)  # Initialize button with GPIO setup
-        self._initAutoSwitch()
+        if isinstance(auto_switch,(int,float)):
+            self._initAutoSwitch(idleTime=auto_switch)
         
         # Add States to be defined using state_template.py
         self.FSM.addState("MultiViewState", MultiViewState(self.FSM)) 
@@ -57,7 +62,7 @@ class Telemetry(feature):
             print("Button Released")
         duration = time.time() - self.press_start_time if self.press_start_time else 0
         self.press_start_time = None  # Reset timing on release
-        if duration >= 3:  # Check if button was held for 3 seconds
+        if duration >= 2:  # Check if button was held for 3 seconds
             self.button_held = True
         else:
             self.button_held = False
@@ -74,16 +79,16 @@ class Telemetry(feature):
         GPIO.add_event_detect(pin, GPIO.BOTH, callback=self.button_callback, bouncetime=50)
 
     # ----------------------------
-    # Keyboard spacebar support
+    # Auto-Switch support
     # ----------------------------
 
-    def _switch_thread(self):
+    def _switch_thread(self, idleTime):
         while True:
-            time.sleep(3)
+            time.sleep(idleTime)
             self.button_held = True
             print("Switch")
             
                 
-    def _initAutoSwitch(self):
-        t = threading.Thread(target=self._switch_thread, daemon=True)
+    def _initAutoSwitch(self,idleTime=5):
+        t = threading.Thread(target=self._switch_thread, args=[idleTime], daemon=True)
         t.start()

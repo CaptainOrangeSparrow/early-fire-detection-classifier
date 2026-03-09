@@ -4,7 +4,7 @@ from Async_class_telemetry import Telemetry
 
 async def main():
 
-    telemetry = Telemetry()
+    telemetry = Telemetry(auto_switch=2)
 
     try:
 

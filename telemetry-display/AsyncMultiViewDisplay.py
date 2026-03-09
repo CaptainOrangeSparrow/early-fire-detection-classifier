@@ -9,8 +9,8 @@ from adc import ADC
 import matplotlib.pyplot as plt
 
 
-DISPLAY_W = 160
-DISPLAY_H = 128
+DISPLAY_W = 128
+DISPLAY_H = 160
 
 
 class FrameStore:
@@ -48,8 +48,13 @@ class MultiViewDisplay:
             rst=29,
             width=DISPLAY_W,
             height=DISPLAY_H,
+            backlight= None,
             rotation=0,
-            invert=False
+            offset_left=0,
+            offset_top=0,
+            bgr=False,
+            invert=False,
+            spi_speed_hz=16_000_000
         )
 
         self.fig, self.ax = plt.subplots(figsize=(1.6, 1.28), dpi=100)
@@ -150,7 +155,7 @@ class MultiViewDisplay:
             async with self.store.lock:
                 self.store.adc = values
 
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(1/25)
                 
     async def graph_task(self):
 
@@ -205,7 +210,7 @@ class MultiViewDisplay:
                 w, h = self.fig.canvas.get_width_height()
 
                 if buf.size != w * h * 4:
-                    await asyncio.sleep(0.2)
+                    await asyncio.sleep(1/25)
                     continue
 
                 img = buf.reshape(h, w, 4)
@@ -215,7 +220,7 @@ class MultiViewDisplay:
                 async with self.store.lock:
                     self.store.graph = graph
 
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(1/25)
             
     async def render_task(self):
 
@@ -230,20 +235,21 @@ class MultiViewDisplay:
 
             self.output_frame(frame)
 
-            await asyncio.sleep(1/20)
+            await asyncio.sleep(1/25) # Attempt 25 FPS display
                 
     def build_frame(self, rgb, ir, graph):
 
-        if self.view == "RGB":
+        rgb = np.rot90(rgb)
+        ir = np.rot90(ir)
 
+        if self.view == "RGB":
             return self.prepare(rgb)
 
         if self.view == "IR":
-
             return self.prepare(ir)
 
         if self.view == "Gas":
-
+            graph = graph.rotate(90, expand=True) # Rotate so that the graph is landscape
             return self.prepare(graph)
 
         return self.multiview(rgb, ir, graph)
@@ -263,20 +269,19 @@ class MultiViewDisplay:
             canvas.paste(ir,(64,0))
 
         if graph is not None:
-
             graph = graph.resize((128,80))
             canvas.paste(graph,(0,80))
 
-        return canvas.rotate(90,expand=True)
+        return canvas #.rotate(90,expand=True)
         
-    def prepare(self, frame, size=(160,128)):
+    def prepare(self, frame, size=(128,160)):
 
         if isinstance(frame, np.ndarray):
-
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # Conversion to RGB
+            #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = Image.fromarray(frame)
 
-        return frame.resize(size)
+        return frame.resize(size, Image.BILINEAR)
             
     def output_frame(self, frame):
 
@@ -290,7 +295,7 @@ class MultiViewDisplay:
             return
 
         img = np.array(frame)
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        #img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         cv2.imshow("Telemetry", img)
         cv2.waitKey(1)
