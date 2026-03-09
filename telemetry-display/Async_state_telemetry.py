@@ -1,5 +1,4 @@
 from FSM import *
-import time
 
 #====================================================================================
 # Example of a specific state that inherits from the base State class
@@ -7,11 +6,13 @@ class MultiViewState(State):
     def __init__(self, FSM):
         super(MultiViewState, self).__init__(FSM)
         self.addTransition('toRGBState', transition('RGBState', condition=self.wasHeld, debug=self.FSM.debug))
+        self.packetReceived = False
         
     def enter(self):
         if self.FSM.debug:
             print(f"Entering MultiViewState: {self.name}")
-        self.FSM.container.display.set_view("MultiView")  # Set the display to MultiView when entering this state
+            
+        self.FSM.container.display.request_view("MultiView")  # Set the display to MultiView when entering this state
        #super(AwaitPacketState, self).enter() # Call the base class enter method if needed for additional setup
         
     def execute(self):
@@ -38,7 +39,7 @@ class RGBState(State):
     def enter(self):
         if self.FSM.debug:
             print(f"Entering RGBState: {self.name}")
-        self.FSM.container.display.set_view("RGB")  # Set the display to RGB when entering this state
+        self.FSM.container.display.request_view("RGB")  # Set the display to RGB when entering this state
        #super(AwaitPacketState, self).enter() # Call the base class enter method if needed for additional setup
         
     def execute(self):
@@ -65,7 +66,7 @@ class IRState(State):
     def enter(self):
         if self.FSM.debug:
             print(f"Entering IRState: {self.name}")
-        self.FSM.container.display.set_view("IR")  # Set the display to IR when entering this state
+        self.FSM.container.display.request_view("IR")  # Set the display to IR when entering this state
        #super(AwaitPacketState, self).enter() # Call the base class enter method if needed for additional setup
         
     def execute(self):
@@ -92,7 +93,7 @@ class GasState(State):
         if self.FSM.debug:
             print(f"Entering GasState: {self.name}")
         #super(AwaitPacketState, self).enter() # Call the base class enter method if needed for additional setup
-        self.FSM.container.display.set_view("Gas")  # Set the display to Gas when entering this state
+        self.FSM.container.display.request_view("Gas")  # Set the display to Gas when entering this state
         
     def execute(self):
         if self.wasHeld():

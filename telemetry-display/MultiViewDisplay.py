@@ -239,19 +239,21 @@ class MultiViewDisplay:
 
         try:
             camera_frame = self.camera_feed.get_frame().convert('RGB')
-            canvas.paste(camera_frame, (0, 0))
+            if camera_frame.size == (64,80):
+                canvas.paste(camera_frame, (0, 0))
         except Exception as e:
             print(f"RGB frame error: {e}")
 
         try:
             ir_frame = self.ir_feed.get_frame().convert('RGB')  # force RGB mode
-            canvas.paste(ir_frame, (64, 0))
+            if ir_frame.size == (64,80):
+                canvas.paste(ir_frame, (64, 0))
         except Exception as e:
             print(f"IR frame error: {e}")
 
         try:
             graph_img = self.graph.get_graph_image()
-            if graph_img is not None:
+            if graph_img is not None and graph_img.size == (128, 80):
                 canvas.paste(graph_img.convert('RGB'), (0, 80))
         except Exception as e:
             print(f"Graph frame error: {e}")
@@ -267,20 +269,23 @@ class MultiViewDisplay:
                 self.ir_feed.set_frame_size((64, 80))
                 self.graph.set_frame_size((128, 80))
             elif self.current_view == "RGB":
-                self.camera_feed.set_frame_size((128, 160))
+                self.camera_feed.set_frame_size((128,160)) # Change the orientation
             elif self.current_view == "IR":
-                self.ir_feed.set_frame_size((128, 160))
+                self.ir_feed.set_frame_size((128,160))
             elif self.current_view == "Gas":
-                self.graph.set_frame_size((160, 128))  
+                self.graph.set_frame_size(( 128,160))  
             # Clear display to black to prevent ghosting from previous view
             blank = Image.new('RGB', (128, 160), color=(0, 0, 0))
             self.disp.display(blank)
+
+            time.sleep(0.1)
+
             print(f"Switched to view: {view_name}")
         else:
             print(f"Invalid view: {view_name}")
 
     def get_current_view_frame(self):
-        FULL = (128, 160)
+        FULL = (128,160)
 
         if self.current_view == "MultiView":
             return self.create_composite_frame()
@@ -314,7 +319,7 @@ class MultiViewDisplay:
 
                 frame = self.get_current_view_frame()
                 if frame is not None:
-                    self.disp.display(frame)
+                    self.disp.display(frame.convert('RGB'))
 
                 self.frame_count += 1
 
