@@ -1,17 +1,28 @@
+blinker==1.9.0
+click==8.3.1
 contourpy==1.3.3
 cycler==0.12.1
+evdev==1.9.3
+Flask==3.1.3
 fonttools==4.60.1
 gpiod==2.4.0
 gpiodevice==0.0.5
+itsdangerous==2.2.0
+Jetson.GPIO==2.1.12
+Jinja2==3.1.6
 kiwisolver==1.4.9
+MarkupSafe==3.0.3
 matplotlib==3.10.7
 numpy==2.2.6
 opencv-python==4.12.0.88
-packaging==25.0
+packaging @ file:///home/task_176104874450359/conda-bld/packaging_1761049083468/work
 pillow==12.0.0
+pynput==1.8.1
 pyparsing==3.2.5
 python-dateutil==2.9.0.post0
-RPi.GPIO==0.7.1
+python-xlib==0.33
 six==1.17.0
+smbus2==0.6.0
 spidev==3.8
-st7735==1.0.0
+st7735==1.0.0 # Grab custom implementation
+Werkzeug==3.1.6

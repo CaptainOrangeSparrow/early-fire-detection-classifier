@@ -32,7 +32,9 @@ from utilities.fps_tracker import FPSTracker
 from utilities.key_handler import TerminalKeyWatcher, poll_quit_key
 from utilities.web_preview import WebPreviewServer, generate_colorbar_png
 from utilities.single_instance import SingleInstance
-from utilities.ir_raw_writer import IrRawChunkWriter, IRMeta
+#from utilities.ir_raw_writer import IrRawChunkWriter, IRMeta
+from utilities.ir_raw_writer_buffered import IRMeta
+from utilities.ir_raw_writer_buffered import IrRawChunkWriterDoubleBuffer as IrRawChunkWriter
 
 # ----------------------------
 # Thread-safe “latest value” holders
@@ -293,6 +295,7 @@ class RecorderGUI(QWidget):
         view_only: bool = False,
         web_preview: bool = False,
         use_gstreamer: bool = False,
+        use_gst_tee: bool = False,
         verbose: bool = False
     ):
         super().__init__()
@@ -303,12 +306,15 @@ class RecorderGUI(QWidget):
         self.terminal_quit = terminal_quit
         self.view_only = view_only
 
+        self.use_gstreamer = use_gstreamer
+        self.gst_tee = use_gst_tee
+
         # Devices
         self.stop_evt = threading.Event()
         
         # Cameras
-        self.reg_cam = Camera(reg_id, use_gstreamer=use_gstreamer)
-        self.ir_cam = IRCamera(ir_id, ir_colormap, use_gstreamer=use_gstreamer, norm_settings=ir_norm_settings)
+        self.reg_cam = Camera(reg_id, use_gstreamer=use_gstreamer, gst_tee=use_gst_tee, gst_record_path=os.path.join(self.run_dir,"regular.mp4"))
+        self.ir_cam = IRCamera(ir_id, ir_colormap, use_gstreamer=use_gstreamer, gst_tee=use_gst_tee, gst_record_path=os.path.join(self.run_dir, "ir.mp4"), norm_settings=ir_norm_settings)
 
         # ADC
         self.adc = ADC()
@@ -323,8 +329,9 @@ class RecorderGUI(QWidget):
         self.ze07co = ZE07CO()
 
         # Try to request fps (some cams ignore it)
-        for cap in (self.reg_cam._cap, self.ir_cam._cap):
-            cap.set(cv2.CAP_PROP_FPS, fps)
+        if not use_gstreamer:
+            for cap in (self.reg_cam._cap, self.ir_cam._cap):
+                cap.set(cv2.CAP_PROP_FPS, fps)
 
         # Shared state
         self.latest_reg = LatestFrame()
@@ -543,6 +550,10 @@ class RecorderGUI(QWidget):
         h1, w1 = ir.shape[:2]
 
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+
+        rgb_written_by_gst = bool(self.use_gstreamer and not self.gst_tee)
+
+        # TODO gate gst_tee
         self.writer_reg = cv2.VideoWriter(os.path.join(self.run_dir, "regular.mp4"), fourcc, self.fps, (w0, h0))
         self.writer_ir  = cv2.VideoWriter(os.path.join(self.run_dir, "ir.mp4"),      fourcc, self.fps, (w1, h1))
         return True
@@ -688,6 +699,7 @@ def parse_args():
     p.add_argument("--view-only", action="store_true", help="Show streams + ADC but do not write any recordings")
     p.add_argument("--web-stream", action="store_true", help="Serve a browser web stream (MJPEG + JSON) at http://localhost:5000/")
     p.add_argument("--gstreamer", action="store_true", help="Use GStreamer pipelines for camera capture (cv2.CAP_GSTREAMER)")
+    p.add_argument("--gst-tee", action="store_true", help="Use tee for GStreamer for separate mp4 writing and frame processing")
     p.add_argument("-v", "--verbose", action="store_true", help="Print out detailed logging. (For web preview)")
     p.add_argument("--ir-norm", type=str, default="minmax", help="Set the normalization method for IR camera frames. (minmax or fixed)")
     p.add_argument("--ir-max", type=float, default="80.0", help="Set the maximum temperature for the IR camera in fixed normalization mode")
@@ -709,7 +721,7 @@ def main():
         print("Another instance of this script is already running!\n")
         raise SystemExit(1)
 
-    run_dir = None if args.view_only else make_unique_dir(args.recordings_dir, args.name, args.fps)
+    run_dir = "/home/firedistinguisher/projects/early-fire-detection-classifier/data-recording/view-dummy-dir" if args.view_only else make_unique_dir(args.recordings_dir, args.name, args.fps)
     cmap = IRCamera.ColorMap[args.ir_colormap]
     generate_colorbar_png(os.path.join("utilities/static", "colorbar.png"), IRCamera.COLORMAPS_LIST[cmap.value], num_ticks=3)
 
@@ -735,6 +747,8 @@ def main():
         view_only = args.view_only,
         web_preview = args.web_stream,
         use_gstreamer = args.gstreamer,
+        #use_gst_tee = args.gst_tee,
+        use_gst_tee = False,
         verbose = args.verbose
     )
     w.resize(1400, 700)

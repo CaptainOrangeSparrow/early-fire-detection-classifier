@@ -1,0 +1,249 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Web Preview</title>
+  <style>
+    body { font-family: sans-serif; margin: 16px; }
+    .row { display: flex; gap: 16px; align-items: flex-start; }
+    .card { border: 1px solid #ccc; padding: 12px; border-radius: 8px; }
+    img { max-width: 100%; height: auto; border-radius: 8px; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    table { border-collapse: collapse; width: 100%; }
+    td { padding: 4px 8px; border-bottom: 1px solid #eee; }
+    .label { color: #555; }
+    .value { text-align: right; font-family: monospace; }
+    .colorbar-wrap { width: 100% }
+    .colorbar-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #555;
+      margin-top: 4px;
+    }
+    .column { display: flex; gap: 16px; flex-direction: column; }
+    .ticks { position: relative; height: 16px; margin-top: 4px; }
+    .tick {
+      position: absolute;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: #555;
+      font-family: monospace;
+      white-space: nowrap;
+    }
+    .tick.left {
+      transform: translateX(0%);     /* left-aligned */
+      text-align: left;
+    }
+    .tick.right {
+      transform: translateX(-100%);  /* right-aligned */
+      text-align: right;
+    }
+    .satline {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #555;
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+    }
+    .mono { font-family: monospace; }
+    .clip-ok { color: #555; }
+    .clip-warn { color: #c00; font-weight: 600; }
+    .meta-box {
+      max-height: 260px;
+      overflow-y: auto;
+      font-size: 11px;
+      background: #f7f7f7;
+      padding: 6px;
+      border-radius: 6px;
+    }
+    .band-good {
+      color: #2e7d32;   /* green */
+      font-weight: 600;
+    }
+
+    .band-elevated {
+      color: #f9a825;   /* amber */
+      font-weight: 600;
+    }
+
+    .band-danger {
+      color: #c62828;   /* red */
+      font-weight: 700;
+    }
+
+
+  </style>
+</head>
+<body>
+  <h2>Data Recorder Live Web View</h2>
+  <div class="row">
+    <div class="column" style="flex: 3;">
+      
+      <div class="card">
+        <div><b>Video</b></div>
+        <img src="/video" />
+        <div style="height: 10px;"></div>
+        <div class="colorbar-wrap">
+          <img id="colorbar" src="/static/colorbar.png" style="width:100%; border-radius:8px; border:1px solid #ccc;" />
+          <!--
+	  <div class="colorbar-labels">
+            <span id="cb_min">Min</span>
+            <span id="cb_max">Max</span>
+          </div>
+	  -->
+	  <div class="ticks">
+            <span class="tick left" style="left:0%;"   id="tick0">-</span>
+            <span class="tick" style="left:25%;"  id="tick25">-</span>
+            <span class="tick" style="left:50%;"  id="tick50">-</span>
+            <span class="tick" style="left:75%;"  id="tick75">-</span>
+            <span class="tick right" style="left:100%;" id="tick100">-</span>
+          </div>
+
+          <div class="satline">
+            <span id="norm_label"><b>Fixed Normalization Clipping:</b></span>
+	    <span id="clip_block" style="display: inline;">
+	      <span id="clip_low" class="mono clip-ok">low <span id="sat_low">-</span>%</span>
+	      <span class="mono">|</span>
+	      <span id="clip_high" class="mono clip-ok">high <span id="sat_high">-</span>%</span>
+            </span>
+
+	    <span id="range_block" style="display:none;">
+              <span class="mono">|</span>
+              <span class="mono">ΔT Range: <span id="tdelta">-</span> °C</span>
+            </span>
+	  </div>
+        </div>
+      </div>
+
+      <div style="height: 12px;"></div>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <b>Live ADC Chart</b>
+          <span class="mono"> 10Hz refresh | recent 30s</span>
+        </div>
+        <div style="height: 6px;"></div>
+        <div style="height: 220px;">
+          <canvas id="adcChart"></canvas>
+        </div>
+	<div class="mono" style="margin-top:15px;">Start time: <span id="runstart">-</span></div>
+      </div>
+
+    </div>
+    <div class="column" style="flex: 2;">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <b>Status</b>
+          <span class="mono" id="data_age">--</span>
+        </div>
+	<div><b>Web Video Stream FPS:</b> <span id="webfps">-</span></div>
+        <div style="height: 8px;"></div>
+        <div><b>Status</b></div>
+        <pre id="status">Loading...</pre>
+        <div style="height: 8px;"></div>
+        <div><b>ADC Values (raw)</b></div>
+        <table>
+          <tbody id="adc">
+            <tr><td class="label">ADC0 CH0 MQ-4 (CH4)</td><td class="value" id="adc_0">-</td></tr>
+            <tr><td class="label">ADC0 CH1 MQ-7 (CO)</td><td class="value" id="adc_1">-</td></tr>
+            <tr><td class="label">ADC0 CH2 MQ-138 (VOCs)</td><td class="value" id="adc_2">-</td></tr>
+            <tr><td class="label">ADC0 CH3 KY-026 Flame</td><td class="value" id="adc_3">-</td></tr>
+            <tr><td class="label">ADC1 CH0 MiCS-6814 NO2</td><td class="value" id="adc_4">-</td></tr>
+            <tr><td class="label">ADC1 CH1 MiCS-6814 NH3</td><td class="value" id="adc_5">-</td></tr>
+            <tr><td class="label">ADC1 CH2 MiCS-6814 CO</td><td class="value" id="adc_6">-</td></tr>
+            <tr><td class="label">ADC1 CH3 (Floating) </td><td class="value" id="adc_7">-</td></tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="card" id="env_card">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <b>Environment</b>
+          <span class="mono">10Hz refresh | recent 30s</span>
+        </div>
+
+        <div style="height:10px;"></div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+
+          <div class="card" style="border:1px solid #eee;">
+            <div class="label">Temp</div>
+            <div class="mono" style="font-size:20px;">
+              <span id="temp_val">-</span>
+              <span class="label">°C</span>
+            </div>
+            <div class="label" style="font-size:12px;">
+              min/avg/max: <span class="mono" id="temp_stats">-</span>
+            </div>
+          </div>
+
+          <div class="card" style="border:1px solid #eee;">
+            <div class="label">Humidity</div>
+            <div class="mono" style="font-size:20px;">
+              <span id="rh_val">-</span>
+              <span class="label">%RH</span>
+            </div>
+            <div class="label" style="font-size:12px;">
+              min/avg/max: <span class="mono" id="rh_stats">-</span>
+            </div>
+          </div>
+
+        </div>
+
+        <div style="height:10px;"></div>
+        <div style="height:160px;">
+          <canvas id="envChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card" id="carbon_gas_card">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <b>CO2/CO Sensors</b>
+          <span class="mono">1Hz update</span>
+        </div>
+
+        <div style="height:10px;"></div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+
+          <div class="card" style="border:1px solid #eee;">
+            <div class="label">CO₂</div>
+            <div class="mono" style="font-size:20px;">
+              <span id="co2_val">-</span>
+              <span class="label">ppm</span>
+            </div>
+            <div class="label" style="font-size:12px;">
+              <span id="co2_band" class="mono">-</span>
+            </div>
+          </div>
+
+          <div class="card" style="border:1px solid #eee;">
+            <div class="label">CO</div>
+            <div class="mono" style="font-size:20px;">
+              <span id="co_val">-</span>
+              <span class="label">ppm</span>
+            </div>
+            <div class="label" style="font-size:12px;">
+              <span id="co_band" class="mono">-</span>
+            </div>
+          </div> 
+        </div>
+
+	<div style="height:10px;"></div>
+	<div style="height:160px;">
+          <canvas id="gasChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card" style="flex: 2;">
+        <div><b>Metadata</b></div>
+        <pre id="meta" class="meta-box">Loading...</pre>
+      </div>
+    </div>
+  </div>
+  <script src="/static/chartjs-package/dist/chart.umd.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+
