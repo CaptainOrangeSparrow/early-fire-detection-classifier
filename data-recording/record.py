@@ -674,11 +674,14 @@ class RecorderGUI(QWidget):
         except Exception:
             pass
 
+        time.sleep(0.05) # wait for threads to stop, then close cameras
         try:
             self.reg_cam.close()
             self.ir_cam.close()
         except Exception:
             pass
+
+        self.web.stop()
 
         self.status.setText(f"Stopped. Saved to: {self.run_dir}")
         QApplication.quit()

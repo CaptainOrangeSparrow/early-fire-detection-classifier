@@ -9,8 +9,6 @@ import cv2
 import numpy as np
 from enum import Enum
 
-from peripherals.gst_tools.gst_capture import GstRgbCapture, GstIrCaptureRawYuy2
-
 class Camera():
 
     def __init__(self, device_id, use_gstreamer=False, gst_tee=False, gst_pipeline=None, gst_record_path=None, width=640, height=480, fps=30, video_format="MJPG"):

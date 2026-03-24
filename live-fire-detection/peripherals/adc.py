@@ -21,7 +21,15 @@ class ADC:
         adc0 = ADS1115(0x48, self.i2c_bus)
         adc1 = ADS1115(0x49, self.i2c_bus, pga=1) # pga 1 = normal, pga = 4 scaled
         self.ads1115_list = [adc0, adc1]
-    
+   
+        self._values = [0, 0, 0, 0, 0, 0, 0, 0]
+
+    def get_all_latest(self):
+        return self._values
+
+    def update_all(self):
+        self._values = self.read4_once(0) + self.read4_once(1)
+
     def get_i2c_bus(self):
         return self.i2c_bus
 

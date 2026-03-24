@@ -13,6 +13,7 @@ from flask import Flask, Response, jsonify, send_from_directory
 import logging
 
 from utilities.fps_tracker import FPSTracker
+import utilities.image_drawing as idraw
 
 WEB_HOST = "0.0.0.0"
 WEB_PORT = 5000
@@ -93,27 +94,13 @@ class WebPreviewServer:
     def __init__(
         self,
         meta_info,
-        get_rgb_frame: Callable[[], Optional[np.ndarray]],
-        get_ir_frame: Callable[[], Optional[np.ndarray]],
         get_status: Callable[[], str],
-        get_adc_values: Callable[[], List[int]],
-        get_ir_stats: Callable[[], tuple],
-        get_cmap: Callable[[], str],
-        get_ir_norm_stats: Callable[[], tuple],
-        get_hdc_data: Callable[[], tuple],
-        get_carbon_data: Callable[[], tuple],
+        get_latest_sensor_data,
         verbose=False
     ):
         self._meta_info = meta_info
-        self.get_rgb_frame = get_rgb_frame
-        self.get_ir_frame = get_ir_frame
         self.get_status = get_status
-        self.get_adc_values = get_adc_values
-        self.get_ir_stats = get_ir_stats
-        self.get_cmap = get_cmap
-        self.get_ir_norm_stats = get_ir_norm_stats
-        self.get_hdc_data = get_hdc_data
-        self.get_carbon_data = get_carbon_data
+        self.get_latest = get_latest_sensor_data
         self.verbose = verbose
 
         self.runstart = self._meta_info["data_recorder"]["output_info"]["creation_unix_time"]
@@ -139,21 +126,30 @@ class WebPreviewServer:
         self.app = Flask(__name__)
         self._routes()
 
+        self._ml_results = None
+
         print(f"Web preview: http://{WEB_HOST}:{WEB_PORT}/\n")
+
+    def update_ml_results(self, ml_results_dict):
+        self._ml_results = ml_results_dict
 
     def _producer_loop(self):
         period = 1.0 / max(self.preview_fps, 1)
 
         while not self._stop_evt.is_set():
             t0 = time.perf_counter()
-
-            rgb = self.get_rgb_frame()
-            ir  = self.get_ir_frame()
+           
+            rgb = self.get_latest().reg.get().frame
+            ir  = self.get_latest().ir.get().frame
 
             if rgb is not None and ir is not None:
                 # IMPORTANT: copy so capture threads can't mutate while encoding
                 rgb = rgb.copy()
                 ir  = ir.copy()
+                
+                if self._ml_results is not None:
+                    idraw.draw_bounding_boxes(rgb, self._ml_results["raw_detections"]["visible"]["boxes"], self._ml_results["raw_detections"]["visible"]["classes"])
+                    idraw.draw_bounding_boxes(ir, self._ml_results["raw_detections"]["infrared"]["boxes"], self._ml_results["raw_detections"]["infrared"]["classes"])
 
                 rgb_small = _safe_resize(rgb, self.preview_width)
                 ir_small  = _safe_resize(ir,  self.preview_width)
@@ -196,28 +192,24 @@ class WebPreviewServer:
                 while not self._stop_evt.is_set():
                     #with self._state_lock:
                     web_fps = float(self._current_web_fps)
-                    ir_min, ir_max, ir_avg, ir_center = self.get_ir_stats()
-                    norm_min, norm_max, sat_below, sat_above, norm_mode = self.get_ir_norm_stats()
-                    temp, hum = self.get_hdc_data()
-                    co2_ppm, co_ppm = self.get_carbon_data()
                     payload = {
                         "t": time.time(),
                         "status": self.get_status(),
-                        "adc": self.get_adc_values(),
+                        "adc": self.get_latest().adc.get().values,
                         "web_fps": web_fps,
-                        "ir_min": ir_min,
-                        "ir_max": ir_max,
-                        "cmap": self.get_cmap(),
-                        "norm_mode": norm_mode,
-                        "norm_max": norm_max,
-                        "norm_min": norm_min,
-                        "sat_above": sat_above,
-                        "sat_below": sat_below,
+                        "ir_min": self.get_latest().ir.get().tmin,
+                        "ir_max": self.get_latest().ir.get().tmax,
+                        "cmap": self.get_latest().ir.get().colormap,
+                        "norm_mode": self.get_latest().ir.get().norm_mode,
+                        "norm_max": self.get_latest().ir.get().norm_max,
+                        "norm_min": self.get_latest().ir.get().norm_min,
+                        "sat_above": self.get_latest().ir.get().sat_above,
+                        "sat_below": self.get_latest().ir.get().sat_below,
                         "runstart": self.runstart,
-                        "hdc_temp_c": temp,
-                        "hdc_humidity_rh": hum,
-                        "co2_ppm": co2_ppm,
-                        "co_ppm": co_ppm,
+                        "hdc_temp_c": self.get_latest().hdc3022.get().temp,
+                        "hdc_humidity_rh": self.get_latest().hdc3022.get().humidity,
+                        "co2_ppm": self.get_latest().sen0219.get().ppm,
+                        "co_ppm": self.get_latest().ze07co.get().ppm,
                     }
                     # SSE format: "data: <json>\n\n"
                     yield f"data: {json.dumps(payload)}\n\n"
