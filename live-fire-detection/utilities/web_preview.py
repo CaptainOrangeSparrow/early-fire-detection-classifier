@@ -13,6 +13,7 @@ from flask import Flask, Response, jsonify, send_from_directory
 import logging
 
 from utilities.fps_tracker import FPSTracker
+import utilities.image_drawing as idraw
 
 WEB_HOST = "0.0.0.0"
 WEB_PORT = 5000
@@ -125,14 +126,19 @@ class WebPreviewServer:
         self.app = Flask(__name__)
         self._routes()
 
+        self._ml_results = None
+
         print(f"Web preview: http://{WEB_HOST}:{WEB_PORT}/\n")
+
+    def update_ml_results(self, ml_results_dict):
+        self._ml_results = ml_results_dict
 
     def _producer_loop(self):
         period = 1.0 / max(self.preview_fps, 1)
 
         while not self._stop_evt.is_set():
             t0 = time.perf_counter()
-
+           
             rgb = self.get_latest().reg.get().frame
             ir  = self.get_latest().ir.get().frame
 
@@ -140,6 +146,10 @@ class WebPreviewServer:
                 # IMPORTANT: copy so capture threads can't mutate while encoding
                 rgb = rgb.copy()
                 ir  = ir.copy()
+                
+                if self._ml_results is not None:
+                    idraw.draw_bounding_boxes(rgb, self._ml_results["raw_detections"]["visible"]["boxes"], self._ml_results["raw_detections"]["visible"]["classes"])
+                    idraw.draw_bounding_boxes(ir, self._ml_results["raw_detections"]["infrared"]["boxes"], self._ml_results["raw_detections"]["infrared"]["classes"])
 
                 rgb_small = _safe_resize(rgb, self.preview_width)
                 ir_small  = _safe_resize(ir,  self.preview_width)

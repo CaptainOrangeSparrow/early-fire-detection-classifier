@@ -4,10 +4,8 @@ from telemetry.Async_class_telemetry import Telemetry
 
 
 class TelemetryWrapper:
-    def __init__(self, auto_switch=5, debug=True, rgb_cam=None, ir_cam=None, adc_module=None):
-        self.auto_switch = auto_switch
-        self.debug = debug
-
+    def __init__(self, sensors=None, auto_switch=5, debug=False):
+        
         self._thread = None
         self._loop = None
         self._task = None
@@ -15,28 +13,34 @@ class TelemetryWrapper:
         self._started = threading.Event()
         self._stopped = threading.Event()
         self._exception = None
-        self.rgb_cam = rgb_cam
-        self.ir_cam = ir_cam
-        self.adc_module = adc_module
+
+        # Telemetry params
+        self.auto_switch = auto_switch
+        self.debug = debug
+        self.sensors = sensors
 
 
     async def _run_async(self):
-        self._telemetry = Telemetry(auto_switch=self.auto_switch, debug=self.debug, rgb_cam=self.rgb_cam, ir_cam=self.ir_cam, adc_module=self.adc_module)
-        self._started.set()
+        print("Running Async from Wrapper")
+
+        # Telemetry Entry Point Here ----------------------------------------------------------
+        
+        self._telemetry = Telemetry(self.sensors, auto_switch=self.auto_switch, debug=self.debug)
 
         try:
+            print("Executing from Wrapper")
             await self._telemetry.execute()
         finally:
             try:
-                if hasattr(self._telemetry, "display"):
+                if hasattr(self._telemetry, "display"): # Check for display - probably not needed
                     self._telemetry.display.cleanup()
             finally:
-                self._stopped.set()
+                self._stopped.set() # Set stopped for wrapper class
 
     def _thread_main(self):
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
-
+        self._started.set()
         try:
             self._task = self._loop.create_task(self._run_async())
             self._loop.run_until_complete(self._task)
@@ -61,13 +65,14 @@ class TelemetryWrapper:
         if self._thread is not None and self._thread.is_alive():
             raise RuntimeError("TelemetrySubsystem is already running")
 
+        print("Starting telemetry module")
+
         self._started.clear()
         self._stopped.clear()
         self._exception = None
 
         self._thread = threading.Thread(target=self._thread_main, daemon=True)
         self._thread.start()
-        self._started.wait()
 
     def stop(self, timeout=5.0):
         if self._loop is None or self._task is None:
@@ -80,6 +85,8 @@ class TelemetryWrapper:
         self._loop.call_soon_threadsafe(_cancel_task)
 
         self._stopped.wait(timeout=timeout)
+
+        print("Stopping telemetry module")
 
         if self._thread is not None:
             self._thread.join(timeout=timeout)

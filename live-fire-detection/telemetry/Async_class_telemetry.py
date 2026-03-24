@@ -11,10 +11,12 @@ import asyncio
 feature = type('feature', (object,), {})  # Simple feature class for demonstration
 
 class Telemetry(feature): 
-    def __init__(self, auto_switch: float | int = None, stream: bool = False, debug: bool = False, rgb_cam=None, ir_cam=None, adc_module=None):   
+    def __init__(self, sensors=None, auto_switch: float | int = None, stream: bool = False, debug: bool = False):   
         self.debug = debug
 
-        self.display: MultiViewDisplay = MultiViewDisplay(preview=False, debug=self.debug, rgb_cam=rgb_cam, ir_cam=ir_cam, adc_module=adc_module)
+        print("Initializing Telemetry")
+
+        self.display: MultiViewDisplay = MultiViewDisplay(sensors, preview=False, debug=self.debug)
         
         self.stream = stream
         if self.stream:

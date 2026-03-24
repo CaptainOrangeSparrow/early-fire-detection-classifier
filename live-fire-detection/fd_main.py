@@ -42,6 +42,8 @@ from utilities.key_handler import TerminalKeyWatcher, poll_quit_key
 from utilities.single_instance import SingleInstance
 from utilities.web_preview import generate_colorbar_png
 from telemetry.telemetry_wrapper import TelemetryWrapper
+import real_time_ml_v2 as ml
+from audio.soundthread_v2 import ThreadedSoundPlayer
 
 class FireDistinguisher:
 
@@ -82,15 +84,39 @@ class FireDistinguisher:
             use_gstreamer = False,
             verbose = False
         )
+        self.web = self.dr.get_web_app()
 
         # Telemetry System
-        # self.tw = TelemetryWrapper(auto_switch=5, debug=True)
-        # self.tw.start()
+        self.tw = TelemetryWrapper(sensors=self.sensorsuite.get_sensor_objects(), auto_switch=10, debug=True)
+        self.tw.start()
+
+        # Machine Learning
+        self.vis_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/visible_yolov11n/best_rgb.engine'
+        self.ir_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/infrared_yolov11n/best_ir.engine'
+        self.meta_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/meta-learner/fire_meta_learner.pkl'
+        self.models = ml.initialize_fire_models(vis_path=self.vis_path, ir_path=self.ir_path, meta_path=self.meta_path)
+
+        # Audio
+        self.player = ThreadedSoundPlayer()
 
     def _on_tick(self):
         # Perform the following on every 25Hz tick
-        self.dr.on_tick()
-        pass
+        # Read Sensors
+        # Snapshot contains s synchronized sensor readings and a timestamp
+        snapshot = self.sensorsuite.get_snapshot()
+        
+        # Perform ML
+        ml_results = ml.process_fused_detection(snapshot.reg.frame, snapshot.ir.frame, self.models, returnAnnotatedImg=False)
+        
+        # Pass ML results to Web Stream
+        self.web.update_ml_results(ml_results)
+
+        # Update GUI
+        self.dr.on_tick(snapshot, ml_results)
+
+        if ml_results["meta_decision"]["fire_detection_boolean"]:
+            print("FIRE True")
+            self.player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/chinese_sound_effect.wav")
 
     def program_start(self):
         # Main clock
@@ -146,7 +172,12 @@ class FireDistinguisher:
 
         # Other cleanup
         self.dr.stop_and_close()
-        #self.tw.stop()
+        self.tw.stop()
+
+        self.player.close()
+
+        time.sleep(1) # Wait for sensor consumers to stop
+
         self.sensorsuite.stop_and_close()
 def main():
 

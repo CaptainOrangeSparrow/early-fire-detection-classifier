@@ -184,9 +184,11 @@ def adc_worker(adc: ADC, latest: LatestAdc, stop_evt: threading.Event):
         # for dev in (0, 1):
         #     for ch in (0, 1, 2, 3):
         #         vals.append(adc.read(dev, ch))
-        adc0_values = adc.read4_once(0)
-        adc1_values = adc.read4_once(1)
-        vals = adc0_values + adc1_values
+        #adc0_values = adc.read4_once(0)
+        #adc1_values = adc.read4_once(1)
+        #vals = adc0_values + adc1_values
+        adc.update_all()
+        vals = adc.get_all_latest()
         t1 = time.perf_counter()
         latest.set(AdcPacket(t=t1, values=vals, sweep_dt=(t1 - t0)))
 

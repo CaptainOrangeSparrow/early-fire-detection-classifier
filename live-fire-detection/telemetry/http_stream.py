@@ -5,7 +5,7 @@ import time
 
 class HTTPStreamServer:
 
-    def __init__(self, display, host="0.0.0.0", port=5000):
+    def __init__(self, display, host="0.0.0.0", port=5100):
         self.display = display
         self.host = host
         self.port = port

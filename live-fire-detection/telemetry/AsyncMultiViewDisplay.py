@@ -9,6 +9,7 @@ from peripherals.adc import ADC
 import matplotlib.pyplot as plt
 import time
 import numpy as np
+from collections import deque
 
 
 DISPLAY_W = 128
@@ -26,7 +27,7 @@ class FrameStore:
 
 class MultiViewDisplay:
 
-    def __init__(self, preview=False, debug=False, rgb_cam=None, ir_cam=None, adc_module=None):
+    def __init__(self, sensors=None, preview=False, debug=False):
 
         self.debug = debug
         self.preview = preview
@@ -36,25 +37,24 @@ class MultiViewDisplay:
 
         self.store = FrameStore()
 
-        if rgb_cam == None:
+        # Modifications by Michael to pass in sensor objects
+        # Also added the sensors param to all cascading constructors
+        if sensors == None:
             self.rgb_cam = cm.Camera(0)
+            self.ir_cam = cm.IRCamera(2, cm.IRCamera.ColorMap,INFERNO)
+            self.adc = ADC()
         else:
-            self.rgb_cam = rgb_cam
-        if ir_cam == None:
-            self.ir_cam = cm.IRCamera(2, cm.IRCamera.ColorMap.INFERNO)
-        else:
-            self.ir_cam = ir_cam
-
+            self.sensors = sensors
+            self.rgb_cam = sensors.reg_camera
+            self.ir_cam = sensors.ir_camera
+            self.adc = sensors.adc
+        # End modifications
+        
         self._latest_frame = None
         self._frame_lock = threading.Lock()
         self.start_time = None
         self.frame_number = 0
         
-        if adc_module==None:
-            self.adc = ADC()
-        else:
-            self.adc=adc_module
-
         self.disp = st7735.ST7735(
             port=0,
             cs=0,
@@ -120,7 +120,7 @@ class MultiViewDisplay:
             ncol=2
         )
         
-        self.graph_data = [[] for _ in range(8)]
+        self.graph_data = [deque(maxlen=50) for _ in range(8)]
 
         self.fig.canvas.draw()
         self._bg = self.fig.canvas.copy_from_bbox(self.ax.bbox)
@@ -141,7 +141,7 @@ class MultiViewDisplay:
         while self.running:
 
             try:
-                self.ir_cam.update_frames()
+                #self.ir_cam.update_frames()
                 frame = self.ir_cam.get_latest_frame()
 
                 if frame is not None:
@@ -152,13 +152,13 @@ class MultiViewDisplay:
             except Exception as e:
                 print(f"IR camera error: {e}")
 
-            await asyncio.sleep(1/25)
+            await asyncio.sleep(1/20)
             
     async def rgb_task(self):
 
         while self.running:
 
-            self.rgb_cam.update_frames()
+            #self.rgb_cam.update_frames()
             frame = self.rgb_cam.get_latest_frame()
 
             if frame is not None:
@@ -166,87 +166,84 @@ class MultiViewDisplay:
                 async with self.store.lock:
                     self.store.rgb = frame
 
-            await asyncio.sleep(1/25)
+            await asyncio.sleep(1/20)
             
     async def adc_task(self):
 
         while self.running:
 
-            v0 = self.adc.read4_once(0)
-            v1 = self.adc.read4_once(1)
+            #v0 = self.adc.read4_once(0)
+            #v1 = self.adc.read4_once(1)
 
-            values = v0 + v1
+            #values = v0 + v1
+            values = self.adc.get_all_latest()
 
             async with self.store.lock:
                 self.store.adc = values
 
-            await asyncio.sleep(1/25)
-                
+            await asyncio.sleep(1/20)
+                    
     async def graph_task(self):
-
+        last_xlim = (0, 10)
+        last_ylim = (0, 50)
+        
         while self.running:
-
             async with self.store.lock:
                 vals = self.store.adc
 
             if vals is not None:
-
                 for i, v in enumerate(vals):
                     if i >= len(self.graph_data):
                         break
                     self.graph_data[i].append(v)
-                    self.graph_data[i] = self.graph_data[i][-50:]
 
                 all_values = []
                 max_len = 0
-                
-                # Prepare ADC values
-                scale = 1
 
                 for i, series in enumerate(self.graph_data[:len(self.lines)]):
-
-                    scaled_series = [v / scale for v in series]
-
                     self.lines[i].set_data(range(len(series)), series)
-
-                    if scaled_series:
-                        all_values.extend(scaled_series)
+                    if series:
+                        all_values.extend(series)
                         max_len = max(max_len, len(series))
 
                 if all_values:
-
                     data_min = min(all_values)
                     data_max = max(all_values)
+                    padding = (data_max - data_min) * 0.1 or 1
 
-                    padding = (data_max - data_min) * 0.1
-                    if padding == 0:
-                        padding = 1
+                    new_xlim = (0, max(max_len, 10))
+                    new_ylim = (data_min - padding, data_max + padding)
 
+                    # Only full redraw if limits changed
+                    if new_xlim != last_xlim or new_ylim != last_ylim:
+                        self.ax.set_xlim(*new_xlim)
+                        self.ax.set_ylim(*new_ylim)
+                        self.fig.canvas.draw()
+                        self._bg = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+                        last_xlim = new_xlim
+                        last_ylim = new_ylim
 
+                    # Blit only the lines every frame
                     self.fig.canvas.restore_region(self._bg)
-
                     for line in self.lines:
                         self.ax.draw_artist(line)
-
                     self.fig.canvas.blit(self.ax.bbox)
 
+                    w, h = self.fig.canvas.get_width_height()
                     buf = np.frombuffer(self.fig.canvas.buffer_rgba(), dtype=np.uint8)
 
-                w, h = self.fig.canvas.get_width_height()
+                    if buf.size != w * h * 4:
+                        await asyncio.sleep(1/5)
+                        continue
 
-                if buf.size != w * h * 4:
-                    await asyncio.sleep(1/25)
-                    continue
+                    img = buf.reshape(h, w, 4)
+                    graph = Image.fromarray(img).convert("RGB")
 
-                img = buf.reshape(h, w, 4)
+                    async with self.store.lock:
+                        self.store.graph = graph
 
-                graph = Image.fromarray(img).convert("RGB")
+            await asyncio.sleep(1/5)
 
-                async with self.store.lock:
-                    self.store.graph = graph
-
-            await asyncio.sleep(1/8)
-            
     async def render_task(self):
         if self.start_time is None and self.debug:
             self.start_time = time.perf_counter()
@@ -267,7 +264,7 @@ class MultiViewDisplay:
                 if self.frame_number % 50 == 0:
                     print(f"Frame {self.frame_number}: {round(self.frame_number / (time.perf_counter() - self.start_time), 2)} FPS")
 
-            await asyncio.sleep(1/25) # Attempt 25 FPS display
+            await asyncio.sleep(1/1000) # Attempt 25 FPS display
                 
     def build_frame(self, rgb, ir, graph):
 
@@ -358,8 +355,9 @@ class MultiViewDisplay:
 
         self.running = False
 
-        self.rgb_cam.close()
-        self.ir_cam.close()
+        #self.rgb_cam.close()
+        #self.ir_cam.close()
+        # Cameras closed in main
 
         plt.close("all")
 

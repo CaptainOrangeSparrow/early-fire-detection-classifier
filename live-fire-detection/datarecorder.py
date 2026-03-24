@@ -213,13 +213,18 @@ class DataRecorder:
         if not self.view_only:
             write_meta_json(os.path.join(self.run_dir, "meta.json"), meta_info)
 
+        # ML results
+        self.ml_results = None
+
         # Flask App
+        #self.updated_sensors = None
         self.web = None
         self._last_status_string = "Starting Web App..."
         self.web = WebPreviewServer(
             meta_info=meta_info,
             get_status=lambda: self._last_status_string,
             get_latest_sensor_data=lambda: self.sensorsuite.get_latest_data(),
+            #get_latest_sensor_data=lambda: self.updated_sensors,
             verbose=verbose
         )
         self.web.start()
@@ -235,6 +240,9 @@ class DataRecorder:
     #        else:
     #            print()
     #        self.stop_and_close()
+
+    def get_web_app(self):
+        return self.web
 
     def _init_writers_if_ready(self):
         reg = self.sensorsuite.get_latest_data().reg.get().frame
@@ -254,12 +262,17 @@ class DataRecorder:
         self.writer_ir  = cv2.VideoWriter(os.path.join(self.run_dir, "ir.mp4"),      fourcc, self.fps, (w1, h1))
         return True
 
-    def on_tick(self, snapshot=None):
+    def on_tick(self, snapshot=None, ml_results=None):
         if not self.view_only:
             if self.writer_reg is None or self.writer_ir is None:
                 if not self._init_writers_if_ready():
                     return
         
+        #self.updated_sensors = snapshot
+
+        # Update ML
+        self.ml_results = ml_results
+
         if snapshot == None:
             snapshot = self.sensorsuite.get_snapshot()
         pkt_reg = snapshot.reg
