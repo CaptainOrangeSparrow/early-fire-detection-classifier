@@ -43,7 +43,7 @@ from utilities.single_instance import SingleInstance
 from utilities.web_preview import generate_colorbar_png
 from telemetry.telemetry_wrapper import TelemetryWrapper
 import real_time_ml_v2 as ml
-from audio.soundthread_v2 import ThreadedSoundPlayer
+from audio.soundthread import ThreadedSoundPlayer
 
 class FireDistinguisher:
 
@@ -98,6 +98,7 @@ class FireDistinguisher:
 
         # Audio
         self.player = ThreadedSoundPlayer()
+        ThreadedSoundPlayer.set_main_player(self.player)
 
     def _on_tick(self):
         # Perform the following on every 25Hz tick
@@ -114,6 +115,9 @@ class FireDistinguisher:
         # Update GUI
         self.dr.on_tick(snapshot, ml_results)
 
+        print(ml_results["raw_detections"]["visible"])
+        print(ml_results["raw_detections"]["infrared"])
+
         if ml_results["meta_decision"]["fire_detection_boolean"]:
             print("FIRE True")
             self.player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/chinese_sound_effect.wav")
@@ -126,10 +130,11 @@ class FireDistinguisher:
         self.running = True
         while self.running:
             now = time.perf_counter()
-
-            if now < next_time:
-                time.sleep(next_time - now)
-                continue
+            
+            # Regulate to 25 Hz - comment out to go as fast as possible
+            #if now < next_time:
+                #time.sleep(next_time - now)
+                #continue
 
             # ----- detect latency lateness -----
             lateness = now - next_time
