@@ -12,7 +12,7 @@ from CameraMount2Axis import CameraMount2Axis
 
 class CameraController:
     def __init__(self, pan_pin, tilt_pin):
-        # Define limits as requested: Tilt between 90 and 180
+        # Tilt between 90 and 180
         # Pan defaults to 0-180 (pass None or (0,180))
         
         self.camera = CameraMount2Axis(

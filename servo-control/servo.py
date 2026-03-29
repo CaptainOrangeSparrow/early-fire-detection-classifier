@@ -92,6 +92,18 @@ class Servo:
                 self.transition_type = transition_type
             if speed is not None:
                 self.transition_speed = speed
+                
+    def get_angle(self):
+        """
+        Public API to get the current angle.
+        This does not return the targeted angle,
+        yet it returns the last set angle INTERNALLY.
+        """
+        with self._lock:
+            angle = self.current_angle
+        
+        return angle
+        
 
     def _start_pwm(self, duty):
         """Starts or updates the PWM signal."""
