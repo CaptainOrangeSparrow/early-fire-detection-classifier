@@ -1,12 +1,13 @@
 import asyncio
 import threading
 import cv2
-import numpy as np
 from PIL import Image
 import st7735
 import cameras as cm
 from adc import ADC
 import matplotlib.pyplot as plt
+import time
+import numpy as np
 
 
 DISPLAY_W = 128
@@ -24,8 +25,9 @@ class FrameStore:
 
 class MultiViewDisplay:
 
-    def __init__(self, preview=False):
+    def __init__(self, preview=False, debug=False):
 
+        self.debug = debug
         self.preview = preview
         self.running = True
 
@@ -38,6 +40,9 @@ class MultiViewDisplay:
         
         self._latest_frame = None
         self._frame_lock = threading.Lock()
+        self.start_time = None
+        self.frame_number = 0
+        
 
         self.adc = ADC()
 
@@ -54,7 +59,7 @@ class MultiViewDisplay:
             offset_top=0,
             bgr=False,
             invert=False,
-            spi_speed_hz=16_000_000
+            spi_speed_hz=32_000_000
         )
 
         self.fig, self.ax = plt.subplots(figsize=(1.6, 1.28), dpi=100)
@@ -107,6 +112,17 @@ class MultiViewDisplay:
         )
         
         self.graph_data = [[] for _ in range(8)]
+
+        self.fig.canvas.draw()
+        self._bg = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+
+        # Mark lines as animated
+        for line in self.lines:
+            line.set_animated(True)
+
+        # Fix axis limits upfront — don't call set_xlim/set_ylim in the loop
+        self.ax.set_xlim(0, 50)
+        self.ax.set_ylim(0, 50)  # adjust to your expected PPM range
         
     def request_view(self, name):
         self.view = name
@@ -116,7 +132,9 @@ class MultiViewDisplay:
         while self.running:
 
             try:
+                # TODO: remove the update frames; allow main script to handle updates
                 self.ir_cam.update_frames()
+
                 frame = self.ir_cam.get_latest_frame()
 
                 if frame is not None:
@@ -132,8 +150,10 @@ class MultiViewDisplay:
     async def rgb_task(self):
 
         while self.running:
-
+            
+            # TODO: remove the update frames; allow main script to handle updates
             self.rgb_cam.update_frames()
+
             frame = self.rgb_cam.get_latest_frame()
 
             if frame is not None:
@@ -150,22 +170,23 @@ class MultiViewDisplay:
             v0 = self.adc.read4_once(0)
             v1 = self.adc.read4_once(1)
 
-            values = v0 + v1
+            # TODO: remove above 2 lines and uncomment line below once Michael has implemented get_all_latest 
+            # values = self.adc.get_all_latest()
+
+            # TODO: remove line once once Michael has implemented a way to return all 8 values in a list
+            values = v0 + v1    
 
             async with self.store.lock:
                 self.store.adc = values
 
             await asyncio.sleep(1/25)
-                
+                    
     async def graph_task(self):
-
         while self.running:
-
             async with self.store.lock:
                 vals = self.store.adc
 
             if vals is not None:
-
                 for i, v in enumerate(vals):
                     if i >= len(self.graph_data):
                         break
@@ -174,55 +195,47 @@ class MultiViewDisplay:
 
                 all_values = []
                 max_len = 0
-                
-                # Prepare ADC values
-                scale = 1000
 
                 for i, series in enumerate(self.graph_data[:len(self.lines)]):
-
-                    scaled_series = [v / scale for v in series]
-
-                    self.lines[i].set_data(range(len(series)), scaled_series)
-
-                    if scaled_series:
-                        all_values.extend(scaled_series)
+                    self.lines[i].set_data(range(len(series)), series)
+                    if series:
+                        all_values.extend(series)
                         max_len = max(max_len, len(series))
 
                 if all_values:
-
                     data_min = min(all_values)
                     data_max = max(all_values)
+                    padding = (data_max - data_min) * 0.1 or 1
 
-                    padding = (data_max - data_min) * 0.1
-                    if padding == 0:
-                        padding = 1
-
+                    # Update limits and redraw background before blitting
                     self.ax.set_xlim(0, max(max_len, 10))
                     self.ax.set_ylim(data_min - padding, data_max + padding)
+                    self.fig.canvas.draw()  # full redraw to sync background with new limits
+                    self._bg = self.fig.canvas.copy_from_bbox(self.ax.bbox)  # update bg
 
-                self.fig.canvas.draw()
+                    self.fig.canvas.restore_region(self._bg)
+                    for line in self.lines:
+                        self.ax.draw_artist(line)
+                    self.fig.canvas.blit(self.ax.bbox)
 
-                buf = np.frombuffer(
-                    self.fig.canvas.buffer_rgba(),
-                    dtype=np.uint8
-                )
+                    w, h = self.fig.canvas.get_width_height()
+                    buf = np.frombuffer(self.fig.canvas.buffer_rgba(), dtype=np.uint8)
 
-                w, h = self.fig.canvas.get_width_height()
+                    if buf.size != w * h * 4:
+                        await asyncio.sleep(1/8)
+                        continue
 
-                if buf.size != w * h * 4:
-                    await asyncio.sleep(1/25)
-                    continue
+                    img = buf.reshape(h, w, 4)
+                    graph = Image.fromarray(img).convert("RGB")
 
-                img = buf.reshape(h, w, 4)
+                    async with self.store.lock:
+                        self.store.graph = graph
 
-                graph = Image.fromarray(img).convert("RGB")
-
-                async with self.store.lock:
-                    self.store.graph = graph
-
-            await asyncio.sleep(1/25)
-            
+            await asyncio.sleep(1/8)
+                        
     async def render_task(self):
+        if self.start_time is None and self.debug:
+            self.start_time = time.perf_counter()
 
         while self.running:
 
@@ -234,6 +247,11 @@ class MultiViewDisplay:
             frame = self.build_frame(rgb, ir, graph)
 
             self.output_frame(frame)
+
+            if self.debug:
+                self.frame_number += 1
+                if self.frame_number % 50 == 0:
+                    print(f"Frame {self.frame_number}: {round(self.frame_number / (time.perf_counter() - self.start_time), 2)} FPS")
 
             await asyncio.sleep(1/25) # Attempt 25 FPS display
                 
