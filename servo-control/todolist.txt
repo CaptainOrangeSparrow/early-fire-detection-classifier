@@ -1,3 +1,0 @@
-Create a class to receive instructions from the 
-
-Add the option to clamp servo angles to prevent hardware damage

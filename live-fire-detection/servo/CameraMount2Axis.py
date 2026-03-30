@@ -1,7 +1,7 @@
 import threading
 import time
 import Jetson.GPIO as GPIO
-import servo
+from . import servo
 
 
 class CameraMount2Axis:
@@ -142,39 +142,21 @@ class CameraMount2Axis:
     # Public API — Raster Scan
     # ==========================================================================
 
-    def start_scan(
-        self,
-        duration:    float = 45.0,
-        tilt_steps:  int   = 5,
-        pan_steps:   int   = 9
-    ):
-        """
-        Begin a raster (boustrophedon) scan of the full pan × tilt envelope.
+    def start_scan(self, pan_sweep_time: float = 20.0):
 
-        The scan runs in a daemon background thread and repeats continuously
-        until stop_scan() is called.
-
-        Args:
-            duration:   Seconds to complete one full raster sweep.
-                        Adjust between ~30 s (fast) and ~60 s (thorough).
-                        Default: 45 s.
-            tilt_steps: Number of tilt rows in the raster grid.
-                        More rows = finer vertical coverage.
-                        Default: 5.
-            pan_steps:  Number of pan stops per row.
-                        More stops = finer horizontal coverage.
-                        Default: 9.
-        """
         with self._scan_lock:
+
             if self._scan_running:
-                return  # already scanning
+                return
 
             self._scan_running = True
-            self._scan_thread  = threading.Thread(
+
+            self._scan_thread = threading.Thread(
                 target=self._scan_worker,
-                args=(duration, tilt_steps, pan_steps),
+                args=(pan_sweep_time,),
                 daemon=True
             )
+
             self._scan_thread.start()
 
     def stop_scan(self):
@@ -247,54 +229,74 @@ class CameraMount2Axis:
 
         return waypoints
 
-    def _scan_worker(self, duration: float, tilt_steps: int, pan_steps: int):
-        """
-        Background thread body.  Cycles through raster waypoints indefinitely
-        until _scan_running is set to False.
+    def _scan_worker(self, pan_sweep_time: float):
 
-        The dwell time at each waypoint is:
-            dwell = duration / (tilt_steps × pan_steps)
-        This distributes time evenly and ensures one complete sweep takes
-        exactly ``duration`` seconds.
-        """
-        waypoints  = self._generate_waypoints(tilt_steps, pan_steps)
-        n_waypoints = len(waypoints)
+        pan_min  = self.pan.min_limit
+        pan_max  = self.pan.max_limit
+        tilt_min = self.tilt.min_limit
+        tilt_max = self.tilt.max_limit
 
-        if n_waypoints == 0:
-            return
+        # camera parameters
+        vertical_fov = 42.0
+        overlap = 0.30
 
-        dwell_time = duration / n_waypoints
+        tilt_step = vertical_fov * (1.0 - overlap)
 
-        print(
-            f"[SCAN] Starting raster scan — "
-            f"{tilt_steps} tilt rows × {pan_steps} pan cols = "
-            f"{n_waypoints} waypoints, "
-            f"{dwell_time:.2f} s/waypoint, "
-            f"{duration:.0f} s/sweep."
-        )
+        # generate tilt rows
+        tilt_positions = []
+        t = tilt_min
+        while t <= tilt_max:
+            tilt_positions.append(t)
+            t += tilt_step
 
-        waypoint_idx = 0
+        pause_time = 0.3
+
+        print(f"[SCAN] Smooth row scan: {len(tilt_positions)} rows")
+
         while True:
+
             with self._scan_lock:
                 if not self._scan_running:
-                    break
+                    return
 
-            pan_angle, tilt_angle = waypoints[waypoint_idx]
-            self.set_position(pan_angle, tilt_angle)
+            # snap to start corner
+            self.set_position(pan_min, tilt_positions[0])
+            time.sleep(1.0)
 
-            # Sleep in small increments so stop_scan() is responsive
-            elapsed = 0.0
-            slice_s = 0.05  # 50 ms slices
-            while elapsed < dwell_time:
+            direction = 1
+
+            for tilt in tilt_positions:
+
                 with self._scan_lock:
                     if not self._scan_running:
                         return
-                time.sleep(slice_s)
-                elapsed += slice_s
 
-            waypoint_idx = (waypoint_idx + 1) % n_waypoints
+                # move tilt
+                self.set_tilt(tilt)
 
-        print("[SCAN] Scan stopped.")
+                time.sleep(0.5)
+
+                if direction > 0:
+                    target_pan = pan_max
+                else:
+                    target_pan = pan_min
+
+                # sweep pan
+                self.set_pan(target_pan)
+
+                start = time.time()
+
+                while (time.time() - start) < pan_sweep_time:
+
+                    with self._scan_lock:
+                        if not self._scan_running:
+                            return
+
+                    time.sleep(0.05)
+
+                time.sleep(pause_time)
+
+                direction *= -1
 
     # ==========================================================================
     # Shutdown & Safety
@@ -323,4 +325,3 @@ class CameraMount2Axis:
 
         self.pan.cleanup()
         self.tilt.cleanup()
-        GPIO.cleanup()

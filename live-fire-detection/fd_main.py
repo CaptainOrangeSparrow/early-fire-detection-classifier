@@ -87,7 +87,7 @@ class FireDistinguisher:
         self.web = self.dr.get_web_app()
 
         # Telemetry System
-        self.tw = TelemetryWrapper(sensors=self.sensorsuite.get_sensor_objects(), auto_switch=10, debug=True)
+        self.tw = TelemetryWrapper(sensors=self.sensorsuite.get_sensor_objects(), auto_switch=5, debug=True)
         self.tw.start()
 
         # Machine Learning
