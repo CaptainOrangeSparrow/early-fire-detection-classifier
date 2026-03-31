@@ -35,12 +35,20 @@ TILT_PIN = 32
 PAN_LIMITS  = (0.0,  180.0)
 TILT_LIMITS = (90.0, 180.0)
 
+"""
+Tuning order:
+    1. Set kI = kD = 0. Raise kP until the mount oscillates.
+        Then halve kP.
+    2. Raise kI until drift is eliminated.
+    3. Raise kD until overshoot is damped.
+"""
+
 # PID gains
-PAN_KP,  PAN_KI,  PAN_KD  = 0.2, 0.0, 0.0
-TILT_KP, TILT_KI, TILT_KD = 0.2, 0.0, 0.0
+PAN_KP,  PAN_KI,  PAN_KD  = 0.25, 0.0, 0.0
+TILT_KP, TILT_KI, TILT_KD = 0.6, 0.0, 0.0
 
 # Error sign convention for positve angular error corrections
-PAN_ERROR_SIGN  = +1 # positive because pixel x increases to the right, and positive pan correction should move the camera right
+PAN_ERROR_SIGN  = -1 # positive because pixel x increases to the right, and positive pan correction should move the camera right
 TILT_ERROR_SIGN = -1 # negative because pixel y increases downwards, but positive tilt correction should move the camera up
 
 
@@ -72,8 +80,8 @@ def build_mount() -> CameraMount2Axis:
     return CameraMount2Axis(
         pan_pin=PAN_PIN,
         tilt_pin=TILT_PIN,
-        transition_type='s-curve',
-        transition_speed=0.5,
+        transition_type='sine',
+        transition_speed=1.0,
         pan_limits=PAN_LIMITS,
         tilt_limits=TILT_LIMITS,
         update_rate_hz=50.0
@@ -81,8 +89,8 @@ def build_mount() -> CameraMount2Axis:
 
 
 def build_pids():
-    pid_pan  = PID(kP=PAN_KP,  kI=PAN_KI,  kD=PAN_KD)
-    pid_tilt = PID(kP=TILT_KP, kI=TILT_KI, kD=TILT_KD)
-    pid_pan.initialize()
-    pid_tilt.initialize()
+    pid_pan  = PID(kP=PAN_KP,  kI=PAN_KI,  kD=PAN_KD, minOutput=-HFOV_DEG, maxOutput=HFOV_DEG)
+    pid_tilt = PID(kP=TILT_KP, kI=TILT_KI, kD=TILT_KD, minOutput=-VFOV_DEG, maxOutput=VFOV_DEG)
+    pid_pan.initialize(difference_equation=True)
+    pid_tilt.initialize(difference_equation=True)
     return pid_pan, pid_tilt

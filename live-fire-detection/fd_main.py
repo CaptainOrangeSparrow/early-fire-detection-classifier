@@ -43,7 +43,7 @@ from utilities.single_instance import SingleInstance
 from utilities.web_preview import generate_colorbar_png
 from telemetry.telemetry_wrapper import TelemetryWrapper
 import real_time_ml_v2 as ml
-from audio.soundthread import ThreadedSoundPlayer
+from audio.soundthread_v2 import ThreadedSoundPlayer
 
 class FireDistinguisher:
 
@@ -120,7 +120,7 @@ class FireDistinguisher:
 
         if ml_results["meta_decision"]["fire_detection_boolean"]:
             print("FIRE True")
-            self.player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/chinese_sound_effect.wav")
+            self.player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/chinese_sound_effect.wav", volume=0.0)
 
     def program_start(self):
         # Main clock

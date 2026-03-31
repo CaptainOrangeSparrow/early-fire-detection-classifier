@@ -46,11 +46,10 @@ from servo.pan_tilt_tracking import build_mount, build_pids, pixel_to_angle
 from servo.pan_tilt_tracking import (
     FRAME_W, FRAME_H, HALF_HFOV_RAD, HALF_VFOV_RAD,
     PAN_ERROR_SIGN, TILT_ERROR_SIGN,
-    SCAN_DURATION
 )
 from servo.objcenter import ObjCenter 
 import real_time_ml_v2 as ml
-from audio.soundthread import ThreadedSoundPlayer
+from audio.soundthread_v2 import ThreadedSoundPlayer
 
 class FireDistinguisher:
 
@@ -122,7 +121,7 @@ class FireDistinguisher:
         self.last_obj_y = None # Last known object y-coordinate, used for anti-blink persistence (hold position if briefly lost)
         
         # Begin scanning immediately on startup assuming no fires
-        self.mount.start_scan(SCAN_DURATION)
+        self.mount.start_scan(pan_sweep_time=10, speed=1.5)
 
     def _on_tick(self):
         # Perform the following on every 25Hz tick
@@ -138,12 +137,15 @@ class FireDistinguisher:
         )
         
         # Pan-Tilt Tracking
-        (obj_x, obj_y), (cx, cy), fire_detected = self.obj_finder.update(ml_results) # aquire centroid and fire boolean from ML results
+        (obj_x, obj_y), (cx, cy), fire_detected = self.obj_finder.update(ml_results, fire_coverage_threshold_min=0.01, fire_coverage_threshold_max=0.1) # aquire centroid and fire boolean from ML results
 
         now = time.perf_counter()
 
         # If fire detected, track it with PID; else handle potential loss and resume scan if lost for a while
         if fire_detected:
+
+            print("FIRE True")
+            self.player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/discord_join_sfx.wav", volume=0.0)
             # Record last valid detection time for anti-blink persistence
             self.last_detection_time = now
             self.last_obj_x = obj_x
@@ -174,9 +176,10 @@ class FireDistinguisher:
                 )
 
                 self.mount.stop_scan()
+                self.mount.set_speeds(speed=5)
                 # Reinitialize PID state to prevent integral and derivative windup from scan
-                self.pid_pan.initialize() 
-                self.pid_tilt.initialize()
+                self.pid_pan.initialize(difference_equation=True) 
+                self.pid_tilt.initialize(difference_equation=True)
                 self.track_end_time = None # Currently tracking so reset any previous track loss timer
 
             # If we were previously "not tracking" due to a brief dropout,
@@ -195,8 +198,8 @@ class FireDistinguisher:
             error_tilt = TILT_ERROR_SIGN * pixel_to_angle(dy_px, HALF_VFOV_RAD, FRAME_H)
 
             # Produce new pan/tilt angle updates (P-only for now)
-            pan_update = self.pid_pan.update(error_pan)
-            tilt_update = self.pid_tilt.update(error_tilt)
+            pan_update = self.pid_pan.update(error_pan, difference_equation=True)
+            tilt_update = self.pid_tilt.update(error_tilt, difference_equation=True)
 
             # Calculate and set new pan/tilt positions
             new_pan = self.mount.get_pan() + pan_update
@@ -206,7 +209,7 @@ class FireDistinguisher:
             print(f"Fire Located at (x={obj_x}, y={obj_y}) with confidence {ml_results['meta_decision']['confidence']:.2f}")
             print(f"Pixel error - dx: {dx_px} px, dy: {dy_px} px")
             print(f"Tracking fire - pan error: {error_pan:.2f} deg, tilt error: {error_tilt:.2f} deg")
-            print(f"Updating mount position - new pan: {new_pan:.2f} deg, new tilt: {new_tilt:.2f} deg")
+            print(f"Updating mount position - new pan: {self.mount.get_pan():.2f} deg, new tilt: {self.mount.get_tilt():.2f} deg")
             print(f"PID outputs - pan update: {pan_update:.2f} deg, tilt update: {tilt_update:.2f} deg")
             print(f"FIRE True")
 
@@ -230,7 +233,7 @@ class FireDistinguisher:
                 # True loss: only now declare the target lost
                 self.isTracking = False
                 self.track_end_time = now
-                print(f"Lost fire - resuming scan after 10 seconds. "
+                print(f"Lost fire - resuming scan after 3 seconds. "
                     f"(No detection for {now - self.last_detection_time:.2f}s)")
 
             # Resume scan only after prolonged true loss
@@ -238,7 +241,7 @@ class FireDistinguisher:
                 (not self.mount.is_scanning())         # We are currently tracking or just stopped tracking
                 and (not self.isTracking)              # We are currently not tracking (already past anti-blink)
                 and self.track_end_time is not None    # We have started the track loss timer
-                and (now - self.track_end_time > 10.0) # Wait 10 seconds after loss before resuming scan, to prevent rapid toggling if target is near the edge of detection
+                and (now - self.track_end_time > 3.0) # Wait 3 seconds after loss before resuming scan, to prevent rapid toggling if target is near the edge of detection
             ):
                 print(
                     "\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
@@ -267,7 +270,7 @@ class FireDistinguisher:
                 self.last_obj_y = None
 
                 print("No fire detected - starting scan.")
-                self.mount.start_scan(pan_sweep_time=SCAN_DURATION) # Starts scan returning to bottom corner
+                self.mount.start_scan(pan_sweep_time=10, speed=1.5) # Starts scan returning to bottom corner
 
         # Pass ML results to Web Stream
         self.web.update_ml_results(ml_results)
@@ -276,11 +279,7 @@ class FireDistinguisher:
         self.dr.on_tick(snapshot, ml_results)
 
         #print(ml_results["raw_detections"]["visible"])
-        #print(ml_results["raw_detections"]["infrared"])
-
-        if ml_results["meta_decision"]["fire_detection_boolean"]:
-            print("FIRE True")
-            self.player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/chinese_sound_effect.wav")
+        #print(ml_results["raw_detections"]["infrared"])            
 
     def program_start(self):
         # Main clock

@@ -115,10 +115,25 @@ class CameraMount2Axis:
             self._update_event.set()
 
     def set_position(self, pan_angle, tilt_angle):
-        with self._lock:
-            self._target_pan  = pan_angle
-            self._target_tilt = tilt_angle
+        with self._lock:            
+            self._target_pan = max(self.pan.min_limit, min(self.pan.max_limit, pan_angle))
+            
+            self._target_tilt = max(self.tilt.min_limit, min(self.tilt.max_limit, tilt_angle))
+            
             self._update_event.set()
+
+    def set_speeds(self, speed: float | int = None, pan_speed: float | int = None, tilt_speed: float | int = None):
+        if speed is not None: 
+            self.pan.set_speed(speed)
+            self.tilt.set_speed(speed) 
+            return
+        
+        if tilt_speed is not None:
+            self.tilt.set_speed(tilt_speed)
+
+        if pan_speed is not None: 
+            self.pan.set_speed(pan_speed) 
+
 
     def get_pan(self):
         return self.pan.get_angle()
@@ -142,7 +157,9 @@ class CameraMount2Axis:
     # Public API — Raster Scan
     # ==========================================================================
 
-    def start_scan(self, pan_sweep_time: float = 20.0):
+    def start_scan(self, pan_sweep_time: float = 20.0, speed: float | int = None):
+        if speed is not None: 
+            self.set_speeds(speed) 
 
         with self._scan_lock:
 
@@ -179,56 +196,7 @@ class CameraMount2Axis:
     # ==========================================================================
     # Scan Worker (private)
     # ==========================================================================
-
-    def _generate_waypoints(self, tilt_steps: int, pan_steps: int) -> list:
-        """
-        Pre-compute the ordered list of (pan, tilt) waypoints for one full
-        raster sweep.
-
-        Layout
-        ------
-        * Rows run along the tilt axis (top → bottom or configured range).
-        * Columns run along the pan axis, alternating L→R / R→L each row
-          (boustrophedon pattern) to minimise inter-row travel.
-
-        Args:
-            tilt_steps: Number of distinct tilt positions (rows).
-            pan_steps:  Number of distinct pan positions per row (columns).
-
-        Returns:
-            List of (pan_angle, tilt_angle) tuples.
-        """
-        pan_min  = self.pan.min_limit
-        pan_max  = self.pan.max_limit
-        tilt_min = self.tilt.min_limit
-        tilt_max = self.tilt.max_limit
-
-        # Evenly space positions across each axis
-        if tilt_steps > 1:
-            tilt_positions = [
-                tilt_min + i * (tilt_max - tilt_min) / (tilt_steps - 1)
-                for i in range(tilt_steps)
-            ]
-        else:
-            tilt_positions = [(tilt_min + tilt_max) / 2.0]
-
-        if pan_steps > 1:
-            pan_positions = [
-                pan_min + i * (pan_max - pan_min) / (pan_steps - 1)
-                for i in range(pan_steps)
-            ]
-        else:
-            pan_positions = [(pan_min + pan_max) / 2.0]
-
-        waypoints = []
-        for row_idx, tilt in enumerate(tilt_positions):
-            # Alternate pan direction each row (boustrophedon)
-            row_pans = pan_positions if row_idx % 2 == 0 else list(reversed(pan_positions))
-            for pan in row_pans:
-                waypoints.append((pan, tilt))
-
-        return waypoints
-
+    
     def _scan_worker(self, pan_sweep_time: float):
 
         pan_min  = self.pan.min_limit
@@ -238,7 +206,7 @@ class CameraMount2Axis:
 
         # camera parameters
         vertical_fov = 42.0
-        overlap = 0.30
+        overlap = 0.40
 
         tilt_step = vertical_fov * (1.0 - overlap)
 

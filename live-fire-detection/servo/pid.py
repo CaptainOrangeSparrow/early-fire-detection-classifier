@@ -1,4 +1,5 @@
 import time
+from collections import deque
 
 
 class PID:
@@ -10,24 +11,35 @@ class PID:
         3. Raise kD until overshoot is damped.
     """
 
-    def __init__(self, kP: float = 1.0, kI: float = 0.0, kD: float = 0.0):
+    def __init__(self, kP: float = 1.0, kI: float = 0.0, kD: float = 0.0, minOutput: float = -180.0, maxOutput: float = 180.0):
         self.kP = kP
         self.kI = kI
         self.kD = kD
+        self.k1 = self.kP + self.kI + self.kD
+        self.k2 = -self.kP - (2 * self.kD)
+        self.k3 = self.kD
+        self.minOutput = minOutput
+        self.maxOutput = maxOutput
 
 
-    def initialize(self):
-        # Reset states for new tracking target
-        self.currTime  = time.time()
-        self.prevTime  = self.currTime
-        self.prevError = 0.0
+    def initialize(self, difference_equation: bool = False):
+        if not difference_equation: 
+            # Reset states for new tracking target
+            self.currTime  = time.time()
+            self.prevTime  = self.currTime
+            self.prevError = 0.0
 
-        # Term accumulators
-        self.cP = 0.0
-        self.cI = 0.0
-        self.cD = 0.0
+            # Term accumulators
+            self.cP = 0.0
+            self.cI = 0.0
+            self.cD = 0.0
+        else: 
+            self.prevError = deque([0.0, 0.0], maxlen=2) # for difference equation method, we need to keep track of the last two errors
+            self.prevUpdate = 0.0
 
-    def update(self, error: float) -> float:
+
+
+    def update(self, error: float, difference_equation: bool = False) -> float:
         """
         Compute the PID correction for the current normalised error.
 
@@ -36,21 +48,37 @@ class PID:
         Returns:
             Angle delta in degrees to add to the current servo angle.
         """
-        self.currTime = time.time()
-        deltaTime     = self.currTime - self.prevTime
-        deltaError    = error - self.prevError
+        if not difference_equation:
+            self.currTime = time.time()
+            deltaTime     = self.currTime - self.prevTime
+            deltaError    = error - self.prevError
 
-        # Proportional — present error
-        self.cP = error
+            # Proportional — present error
+            self.cP = error
 
-        # Integral — accumulated error over time
-        self.cI += error * deltaTime
+            # Integral — accumulated error over time
+            self.cI += error * deltaTime
 
-        # Derivative — rate of change
-        self.cD = (deltaError / deltaTime) if deltaTime > 0.0 else 0.0
+            # Derivative — rate of change
+            self.cD = (deltaError / deltaTime) if deltaTime > 0.0 else 0.0
 
-        # Save state for next call
-        self.prevTime  = self.currTime
-        self.prevError = error
+            # Save state for next call
+            self.prevTime  = self.currTime
+            self.prevError = error
 
-        return (self.kP * self.cP) + (self.kI * self.cI) + (self.kD * self.cD) # delta angle to apply to current servo angle
+            return (self.kP * self.cP) + (self.kI * self.cI) + (self.kD * self.cD) # delta angle to apply to current servo angle
+        else:
+            deltaUpdate = (self.k1 * error) + (self.k2 * self.prevError[0]) + (self.k3 * self.prevError[1])
+
+            self.prevError.appendleft(error)
+            
+            update = self.prevUpdate + deltaUpdate
+
+            if update > self.maxOutput:
+                update = self.maxOutput
+            elif update < self.minOutput:
+                update = self.minOutput
+                
+            self.prevUpdate = update
+            
+            return update
