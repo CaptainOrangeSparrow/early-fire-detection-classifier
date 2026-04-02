@@ -87,7 +87,7 @@ class FireDistinguisher:
         self.web = self.dr.get_web_app()
 
         # Telemetry System
-        self.tw = TelemetryWrapper(sensors=self.sensorsuite.get_sensor_objects(), auto_switch=10, debug=True)
+        self.tw = TelemetryWrapper(sensors=self.sensorsuite.get_sensor_objects(), auto_switch=5, debug=True)
         self.tw.start()
 
         # Machine Learning
@@ -98,6 +98,7 @@ class FireDistinguisher:
 
         # Audio
         self.player = ThreadedSoundPlayer()
+        ThreadedSoundPlayer.set_main_player(self.player)
 
     def _on_tick(self):
         # Perform the following on every 25Hz tick
@@ -114,9 +115,12 @@ class FireDistinguisher:
         # Update GUI
         self.dr.on_tick(snapshot, ml_results)
 
+        print(ml_results["raw_detections"]["visible"])
+        print(ml_results["raw_detections"]["infrared"])
+
         if ml_results["meta_decision"]["fire_detection_boolean"]:
             print("FIRE True")
-            self.player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/chinese_sound_effect.wav")
+            self.player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/chinese_sound_effect.wav", volume=0.0)
 
     def program_start(self):
         # Main clock
@@ -126,10 +130,11 @@ class FireDistinguisher:
         self.running = True
         while self.running:
             now = time.perf_counter()
-
-            if now < next_time:
-                time.sleep(next_time - now)
-                continue
+            
+            # Regulate to 25 Hz - comment out to go as fast as possible
+            #if now < next_time:
+                #time.sleep(next_time - now)
+                #continue
 
             # ----- detect latency lateness -----
             lateness = now - next_time

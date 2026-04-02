@@ -11,15 +11,17 @@ import asyncio
 feature = type('feature', (object,), {})  # Simple feature class for demonstration
 
 class Telemetry(feature): 
-    def __init__(self, auto_switch: float | int = None, stream: bool = False):        
-        self.display: MultiViewDisplay = MultiViewDisplay(preview=False)
+    def __init__(self, auto_switch: float | int = None, stream: bool = False, debug: bool = False):   
+        self.debug = debug
+
+        self.display: MultiViewDisplay = MultiViewDisplay(preview=False, debug=self.debug)
         
         self.stream = stream
         if self.stream:
             self.http_stream = HTTPStreamServer(self.display)
             self.http_stream.start()
         
-        self.FSM: FSM = FSM(self, debug=True)
+        self.FSM: FSM = FSM(self, debug=self.debug)
         
         self.button = 7  # GPIO pin for button input
         self.button_held = False
@@ -53,12 +55,12 @@ class Telemetry(feature):
         )
 
     def on_press(self):
-        if self.FSM.debug:
+        if self.debug:
             print("Button Pressed")
         self.press_start_time = time.time()  # Start timing when button is first pressed
     
     def on_release(self):
-        if self.FSM.debug:
+        if self.debug:
             print("Button Released")
         duration = time.time() - self.press_start_time if self.press_start_time else 0
         self.press_start_time = None  # Reset timing on release
@@ -86,7 +88,8 @@ class Telemetry(feature):
         while True:
             time.sleep(idleTime)
             self.button_held = True
-            print("Switch")
+            if self.debug:
+                print("Switch")
             
                 
     def _initAutoSwitch(self,idleTime=5):

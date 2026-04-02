@@ -19,7 +19,7 @@ class ADC:
             self._owns_bus = False
         
         adc0 = ADS1115(0x48, self.i2c_bus)
-        adc1 = ADS1115(0x49, self.i2c_bus, pga=1) # pga 1 = normal, pga = 4 scaled
+        adc1 = ADS1115(0x49, self.i2c_bus, pga=1) # pga 1 = normal
         self.ads1115_list = [adc0, adc1]
     
     def get_i2c_bus(self):

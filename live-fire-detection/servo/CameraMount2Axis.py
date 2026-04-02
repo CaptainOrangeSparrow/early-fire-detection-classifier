@@ -1,7 +1,7 @@
 import threading
 import time
 import Jetson.GPIO as GPIO
-import servo
+from . import servo
 
 
 class CameraMount2Axis:
@@ -115,10 +115,25 @@ class CameraMount2Axis:
             self._update_event.set()
 
     def set_position(self, pan_angle, tilt_angle):
-        with self._lock:
-            self._target_pan  = pan_angle
-            self._target_tilt = tilt_angle
+        with self._lock:            
+            self._target_pan = max(self.pan.min_limit, min(self.pan.max_limit, pan_angle))
+            
+            self._target_tilt = max(self.tilt.min_limit, min(self.tilt.max_limit, tilt_angle))
+            
             self._update_event.set()
+
+    def set_speeds(self, speed: float | int = None, pan_speed: float | int = None, tilt_speed: float | int = None):
+        if speed is not None: 
+            self.pan.set_speed(speed)
+            self.tilt.set_speed(speed) 
+            return
+        
+        if tilt_speed is not None:
+            self.tilt.set_speed(tilt_speed)
+
+        if pan_speed is not None: 
+            self.pan.set_speed(pan_speed) 
+
 
     def get_pan(self):
         return self.pan.get_angle()
@@ -142,39 +157,23 @@ class CameraMount2Axis:
     # Public API — Raster Scan
     # ==========================================================================
 
-    def start_scan(
-        self,
-        duration:    float = 45.0,
-        tilt_steps:  int   = 5,
-        pan_steps:   int   = 9
-    ):
-        """
-        Begin a raster (boustrophedon) scan of the full pan × tilt envelope.
+    def start_scan(self, pan_sweep_time: float = 20.0, speed: float | int = None):
+        if speed is not None: 
+            self.set_speeds(speed) 
 
-        The scan runs in a daemon background thread and repeats continuously
-        until stop_scan() is called.
-
-        Args:
-            duration:   Seconds to complete one full raster sweep.
-                        Adjust between ~30 s (fast) and ~60 s (thorough).
-                        Default: 45 s.
-            tilt_steps: Number of tilt rows in the raster grid.
-                        More rows = finer vertical coverage.
-                        Default: 5.
-            pan_steps:  Number of pan stops per row.
-                        More stops = finer horizontal coverage.
-                        Default: 9.
-        """
         with self._scan_lock:
+
             if self._scan_running:
-                return  # already scanning
+                return
 
             self._scan_running = True
-            self._scan_thread  = threading.Thread(
+
+            self._scan_thread = threading.Thread(
                 target=self._scan_worker,
-                args=(duration, tilt_steps, pan_steps),
+                args=(pan_sweep_time,),
                 daemon=True
             )
+
             self._scan_thread.start()
 
     def stop_scan(self):
@@ -197,104 +196,75 @@ class CameraMount2Axis:
     # ==========================================================================
     # Scan Worker (private)
     # ==========================================================================
+    
+    def _scan_worker(self, pan_sweep_time: float):
 
-    def _generate_waypoints(self, tilt_steps: int, pan_steps: int) -> list:
-        """
-        Pre-compute the ordered list of (pan, tilt) waypoints for one full
-        raster sweep.
-
-        Layout
-        ------
-        * Rows run along the tilt axis (top → bottom or configured range).
-        * Columns run along the pan axis, alternating L→R / R→L each row
-          (boustrophedon pattern) to minimise inter-row travel.
-
-        Args:
-            tilt_steps: Number of distinct tilt positions (rows).
-            pan_steps:  Number of distinct pan positions per row (columns).
-
-        Returns:
-            List of (pan_angle, tilt_angle) tuples.
-        """
         pan_min  = self.pan.min_limit
         pan_max  = self.pan.max_limit
         tilt_min = self.tilt.min_limit
         tilt_max = self.tilt.max_limit
 
-        # Evenly space positions across each axis
-        if tilt_steps > 1:
-            tilt_positions = [
-                tilt_min + i * (tilt_max - tilt_min) / (tilt_steps - 1)
-                for i in range(tilt_steps)
-            ]
-        else:
-            tilt_positions = [(tilt_min + tilt_max) / 2.0]
+        # camera parameters
+        vertical_fov = 42.0
+        overlap = 0.40
 
-        if pan_steps > 1:
-            pan_positions = [
-                pan_min + i * (pan_max - pan_min) / (pan_steps - 1)
-                for i in range(pan_steps)
-            ]
-        else:
-            pan_positions = [(pan_min + pan_max) / 2.0]
+        tilt_step = vertical_fov * (1.0 - overlap)
 
-        waypoints = []
-        for row_idx, tilt in enumerate(tilt_positions):
-            # Alternate pan direction each row (boustrophedon)
-            row_pans = pan_positions if row_idx % 2 == 0 else list(reversed(pan_positions))
-            for pan in row_pans:
-                waypoints.append((pan, tilt))
+        # generate tilt rows
+        tilt_positions = []
+        t = tilt_min
+        while t <= tilt_max:
+            tilt_positions.append(t)
+            t += tilt_step
 
-        return waypoints
+        pause_time = 0.3
 
-    def _scan_worker(self, duration: float, tilt_steps: int, pan_steps: int):
-        """
-        Background thread body.  Cycles through raster waypoints indefinitely
-        until _scan_running is set to False.
+        print(f"[SCAN] Smooth row scan: {len(tilt_positions)} rows")
 
-        The dwell time at each waypoint is:
-            dwell = duration / (tilt_steps × pan_steps)
-        This distributes time evenly and ensures one complete sweep takes
-        exactly ``duration`` seconds.
-        """
-        waypoints  = self._generate_waypoints(tilt_steps, pan_steps)
-        n_waypoints = len(waypoints)
-
-        if n_waypoints == 0:
-            return
-
-        dwell_time = duration / n_waypoints
-
-        print(
-            f"[SCAN] Starting raster scan — "
-            f"{tilt_steps} tilt rows × {pan_steps} pan cols = "
-            f"{n_waypoints} waypoints, "
-            f"{dwell_time:.2f} s/waypoint, "
-            f"{duration:.0f} s/sweep."
-        )
-
-        waypoint_idx = 0
         while True:
+
             with self._scan_lock:
                 if not self._scan_running:
-                    break
+                    return
 
-            pan_angle, tilt_angle = waypoints[waypoint_idx]
-            self.set_position(pan_angle, tilt_angle)
+            # snap to start corner
+            self.set_position(pan_min, tilt_positions[0])
+            time.sleep(1.0)
 
-            # Sleep in small increments so stop_scan() is responsive
-            elapsed = 0.0
-            slice_s = 0.05  # 50 ms slices
-            while elapsed < dwell_time:
+            direction = 1
+
+            for tilt in tilt_positions:
+
                 with self._scan_lock:
                     if not self._scan_running:
                         return
-                time.sleep(slice_s)
-                elapsed += slice_s
 
-            waypoint_idx = (waypoint_idx + 1) % n_waypoints
+                # move tilt
+                self.set_tilt(tilt)
 
-        print("[SCAN] Scan stopped.")
+                time.sleep(0.5)
+
+                if direction > 0:
+                    target_pan = pan_max
+                else:
+                    target_pan = pan_min
+
+                # sweep pan
+                self.set_pan(target_pan)
+
+                start = time.time()
+
+                while (time.time() - start) < pan_sweep_time:
+
+                    with self._scan_lock:
+                        if not self._scan_running:
+                            return
+
+                    time.sleep(0.05)
+
+                time.sleep(pause_time)
+
+                direction *= -1
 
     # ==========================================================================
     # Shutdown & Safety
@@ -323,4 +293,3 @@ class CameraMount2Axis:
 
         self.pan.cleanup()
         self.tilt.cleanup()
-        GPIO.cleanup()

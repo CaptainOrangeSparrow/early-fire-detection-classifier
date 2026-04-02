@@ -76,6 +76,11 @@ class Servo:
             elif self.target_angle > max_limit:
                 self.target_angle = max_limit
 
+    def set_speed(self, speed: float | int):
+        with self._lock: 
+            self.transition_speed = speed
+
+
     def set_angle(self, angle, transition_type=None, speed=None):
         """
         Public API to set a new target angle.

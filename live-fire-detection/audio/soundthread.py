@@ -5,10 +5,10 @@ import simpleaudio as sa
 
 
 class ThreadedSoundPlayer:
+    
+    main_player = None
+
     def __init__(self, poll_interval: float = 0.02):
-        """
-        poll_interval: how often the worker checks for new commands while playing
-        """
         self._poll_interval = poll_interval
 
         self._lock = threading.Lock()
@@ -24,32 +24,45 @@ class ThreadedSoundPlayer:
 
         self._thread = threading.Thread(target=self._worker, daemon=True)
         self._thread.start()
+    
+    @staticmethod
+    def set_main_player(player):
+        ThreadedSoundPlayer.main_player = player
 
-        print("Initialized Audio Player")
+    def _normalize_path(self, file_path: str) -> str:
+        return str(Path(file_path).expanduser().resolve())
 
     def play(self, file_path: str) -> None:
         """
         Request playback of a sound file.
-        The most recent request takes priority and interrupts any current sound.
+
+        Behavior:
+        - If the same sound is already playing, do nothing.
+        - If the same sound is already pending, do nothing.
+        - If a different sound is playing or pending, the most recent one wins.
         """
-        print("playing sound", file_path)
-        path = str(Path(file_path).expanduser().resolve())
+        path = self._normalize_path(file_path)
 
         with self._cv:
+            current_is_playing = (
+                self._current_path == path
+                and self._current_play is not None
+                and self._current_play.is_playing()
+            )
+            pending_is_same = self._pending_path == path
+
+            if current_is_playing or pending_is_same:
+                return
+
             self._pending_path = path
             self._stop_requested = False
             self._cv.notify()
 
     def stop(self) -> None:
-        """
-        Stop the currently playing sound and clear any pending play request.
-        """
         with self._cv:
             self._pending_path = None
             self._stop_requested = True
             self._cv.notify()
-
-        print("Stopping audio")
 
     def is_playing(self) -> bool:
         with self._lock:
@@ -60,9 +73,6 @@ class ThreadedSoundPlayer:
             return self._current_path
 
     def close(self) -> None:
-        """
-        Stop playback and shut down the worker thread.
-        """
         with self._cv:
             self._shutdown = True
             self._pending_path = None
@@ -71,12 +81,7 @@ class ThreadedSoundPlayer:
 
         self._thread.join()
 
-        print("Closing audio player")
-
     def _stop_current_locked(self) -> None:
-        """
-        Stop current playback. Caller must hold self._lock / self._cv lock.
-        """
         if self._current_play is not None:
             try:
                 self._current_play.stop()
@@ -109,9 +114,17 @@ class ThreadedSoundPlayer:
                 next_path = self._pending_path
                 self._pending_path = None
 
+                # If the exact same sound is still playing, ignore request.
+                if (
+                    next_path == self._current_path
+                    and self._current_play is not None
+                    and self._current_play.is_playing()
+                ):
+                    continue
+
+                # Different sound requested: interrupt current playback.
                 self._stop_current_locked()
 
-            # Load and start playback outside the lock
             try:
                 wave = sa.WaveObject.from_wave_file(next_path)
                 play_obj = wave.play()
@@ -124,10 +137,6 @@ class ThreadedSoundPlayer:
                 self._current_play = play_obj
                 self._current_path = next_path
 
-            # Stay here until:
-            # - sound finishes
-            # - stop() is called
-            # - a newer play() request arrives
             while True:
                 with self._cv:
                     if self._shutdown:
@@ -139,10 +148,15 @@ class ThreadedSoundPlayer:
                         self._stop_requested = False
                         break
 
+                    # If a new request comes in:
                     if self._pending_path is not None:
-                        # A newer sound request arrived; interrupt current one
-                        self._stop_current_locked()
-                        break
+                        # Same sound as current: ignore it and keep playing.
+                        if self._pending_path == self._current_path:
+                            self._pending_path = None
+                        else:
+                            # Different sound: interrupt current and handle new one.
+                            self._stop_current_locked()
+                            break
 
                     current = self._current_play
 
@@ -161,13 +175,14 @@ if __name__ == "__main__":
 
     player = ThreadedSoundPlayer()
 
-    player.play("/home/firedistinguisher/Music/testing/french_sfx.wav")
-    time.sleep(10)
+    player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/french_sfx.wav")
+    time.sleep(3)
 
     # Interrupt sound1 and play sound2
-    player.play("/home/firedistinguisher/Music/testing/chinese_sound_effect.wav")
+    player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/french_sfx.wav")
     time.sleep(10)
 
     player.stop()
 
     player.close()
+
