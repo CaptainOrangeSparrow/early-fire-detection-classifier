@@ -225,6 +225,20 @@ class IRCamera(Camera):
         #only ussed if render_mode = BLEND
         self.blend_alpha = 0.75
 
+        # EMA Diff Map
+        self._ema_thermal_bgr = None
+        self._ema_thermal_float = None
+
+        # Signed-change display parameters
+        self._change_alpha = 0.08         # EMA update speed 0.08
+        self._change_deadband_c = 0.15    # ignore tiny changes around 0 C 0.15
+        self._change_display_max_c = 2.0  # +/- this many C maps to full intensity 2.0
+        self._change_blur_kernel = 0      # 0 or 1 disables blur 5
+        self._deadband_raw = self._change_deadband_c * 64.0
+        self._display_max_raw = self._change_display_max_c * 64.0
+        
+        self._calculate_ema_diff_map = False
+
     def _build_gst_backend(self, *, device_id, gst_tee, gst_record_path, gst_bitrate, width, height, fps):
         # Ignore RGB-specific parameters; IR capture is fixed-format for your device.
         dev = f"/dev/video{device_id}" if isinstance(device_id, int) else str(device_id)
@@ -253,6 +267,54 @@ class IRCamera(Camera):
 
         norm8_up = cv2.resize(norm8, (IRCamera.newWidth, IRCamera.newHeight), interpolation=cv2.INTER_CUBIC)
         return cv2.applyColorMap(norm8_up, self._colormap)
+
+
+    def _thermal_signed_change_bgr(self):
+        curr = self._raw_thermal_frame.astype(np.float32)
+
+        # Optional smoothing to suppress shimmer/noise
+        if self._change_blur_kernel and self._change_blur_kernel > 1:
+            k = self._change_blur_kernel
+            curr = cv2.GaussianBlur(curr, (k, k), 0)
+
+        # First frame: initialize EMA and show blank image
+        if self._ema_thermal_float is None:
+            self._ema_thermal_float = curr.copy()
+            h, w = curr.shape
+            return np.zeros((h, w, 3), dtype=np.uint8)
+
+        # Signed difference against EMA BEFORE updating EMA
+        signed = curr - self._ema_thermal_float
+        
+        # Update EMA in current frame coordinates
+        a = float(self._change_alpha)
+        self._ema_thermal_float = a * curr + (1.0 - a) * self._ema_thermal_float
+
+        # Split into positive (heating) and negative (cooling)
+        pos = np.maximum(signed - self._deadband_raw, 0.0)
+        neg = np.maximum((-1 * signed) - self._deadband_raw, 0.0)
+        
+        # Debug pos max neg max location
+        #pos_idx = np.unravel_index(np.argmax(pos), pos.shape)
+        #neg_idx = np.unravel_index(np.argmax(neg), neg.shape)
+        #print("pos max:", float(pos[pos_idx]), "at", pos_idx)
+        #print("neg max:", float(neg[neg_idx]), "at", neg_idx)
+
+        # Suppress motion-like mixed positive/negative response
+        overlap = np.minimum(pos, neg)
+        pos = np.maximum(pos - overlap, 0.0)
+        neg = np.maximum(neg - overlap, 0.0)
+        
+        # Scale to 8-bit
+        pos_8 = np.clip(pos * (255.0 / self._display_max_raw), 0, 255).astype(np.uint8)
+        neg_8 = np.clip(neg * (255.0 / self._display_max_raw), 0, 255).astype(np.uint8)
+
+        # BGR output: blue for cooling, red for heating
+        out = np.zeros((curr.shape[0], curr.shape[1], 3), dtype=np.uint8)
+        out[..., 0] = neg_8   # Blue
+        out[..., 2] = pos_8   # Red
+
+        return out
 
 
     def update_frames(self):
@@ -311,7 +373,8 @@ class IRCamera(Camera):
         avgtemp = (avgtemp/64)-273.15
         avgtemp = round(avgtemp,2)
         '''
-        self._raw_thermal_frame = (thdata[...,1].astype(np.uint16) << 8) | thdata[...,0]
+        raw_thermal_frame_fixed_point_kelvin = (thdata[...,1].astype(np.uint16) << 8) | thdata[...,0]
+        self._raw_thermal_frame = (raw_thermal_frame_fixed_point_kelvin / 64.0) - 273.15
 
         raw_min = int(self._raw_thermal_frame.min())
         raw_max = int(self._raw_thermal_frame.max())
@@ -341,6 +404,8 @@ class IRCamera(Camera):
         if self.render_mode in [IRCamera.IRRenderMode.THERMAL_ONLY, IRCamera.IRRenderMode.BLEND]:
             # Need thdata thermal data
             bgr_thermal = self._thermal_colormap_bgr() # <-- Make sure to call this after self._raw_thermal_frame is calculated as it uses that variable
+            if self._calculate_ema_diff_map:
+                self._ema_thermal_bgr = self._thermal_signed_change_bgr()
 
         if self.render_mode == IRCamera.IRRenderMode.IMDATA_ONLY:
             self._current_frame = cv2.applyColorMap(bgr_detail, self._colormap)
@@ -357,6 +422,12 @@ class IRCamera(Camera):
 
     def get_raw_thermal_frame(self):
         return self._raw_thermal_frame
+
+    def get_ema_thermal_temps(self):
+        return self._ema_thermal_float
+
+    def get_ema_thermal_bgr(self):
+        return self._ema_thermal_bgr
 
     def get_temp_stats(self):
         return (getattr(self, "_min_temp", None),

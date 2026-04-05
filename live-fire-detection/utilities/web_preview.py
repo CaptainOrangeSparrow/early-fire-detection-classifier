@@ -128,10 +128,19 @@ class WebPreviewServer:
 
         self._ml_results = None
 
+        self._fire_detected = False # Fire Detected Label
+        self._fire_subtext = ""
+
         print(f"Web preview: http://{WEB_HOST}:{WEB_PORT}/\n")
 
     def update_ml_results(self, ml_results_dict):
         self._ml_results = ml_results_dict
+
+    def set_fire_detected(self, value):
+        self._fire_detected = value
+
+    def set_fire_subtext(self, string):
+        self._fire_subtext = string
 
     def _producer_loop(self):
         period = 1.0 / max(self.preview_fps, 1)
@@ -141,6 +150,9 @@ class WebPreviewServer:
            
             rgb = self.get_latest().reg.get().frame
             ir  = self.get_latest().ir.get().frame
+            #rgb = self.get_latest().ir.get().frame
+            #ir = self.get_latest().ir.get().ema_frame
+
 
             if rgb is not None and ir is not None:
                 # IMPORTANT: copy so capture threads can't mutate while encoding
@@ -210,6 +222,8 @@ class WebPreviewServer:
                         "hdc_humidity_rh": self.get_latest().hdc3022.get().humidity,
                         "co2_ppm": self.get_latest().sen0219.get().ppm,
                         "co_ppm": self.get_latest().ze07co.get().ppm,
+                        "fire_detected": self._fire_detected,
+                        "fire_subtext": self._fire_subtext,
                     }
                     # SSE format: "data: <json>\n\n"
                     yield f"data: {json.dumps(payload)}\n\n"

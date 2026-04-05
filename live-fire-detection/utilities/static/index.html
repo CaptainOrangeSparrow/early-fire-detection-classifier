@@ -62,17 +62,39 @@
       color: #2e7d32;   /* green */
       font-weight: 600;
     }
-
     .band-elevated {
       color: #f9a825;   /* amber */
       font-weight: 600;
     }
-
     .band-danger {
       color: #c62828;   /* red */
       font-weight: 700;
     }
 
+    .fire-status {
+      margin-top: 6px;
+      font-size: 24px;
+      font-weight: 700;
+      text-align: left;
+      line-height: 1.2;
+    }
+    /* States */
+    .fire-status.no-fire {
+      color: #2e7d32;   /* green */
+    }
+    .fire-status.fire {
+      color: #c62828;   /* red */
+    }
+    .fire-status.fire-unknown {
+      color: #777;      /* neutral */
+    }
+    .fire-subtext {
+      margin-top: 2px;
+      font-size: 13px;
+      color: #666;
+      text-align: left;
+      font-family: monospace; /* matches your UI style */
+    }
 
   </style>
 </head>
@@ -80,7 +102,13 @@
   <h2>Data Recorder Live Web View</h2>
   <div class="row">
     <div class="column" style="flex: 3;">
-      
+
+      <div class="card" id="fire-card">
+        <div class="label"><b>Fire Detection</b></div>
+        <div id="fire-status" class="fire-status no-fire">No Fire Detected</div>
+        <div id="fire-subtext" class="fire-subtext"></div>
+      </div>
+
       <div class="card">
         <div><b>Video</b></div>
         <img src="/video" />

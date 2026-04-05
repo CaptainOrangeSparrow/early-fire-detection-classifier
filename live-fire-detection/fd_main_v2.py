@@ -48,7 +48,7 @@ from servo.pan_tilt_tracking import (
     PAN_ERROR_SIGN, TILT_ERROR_SIGN,
 )
 from servo.objcenter import ObjCenter 
-import real_time_ml_v2 as ml
+import real_time_ml_v3 as ml
 from audio.soundthread_v2 import ThreadedSoundPlayer
 
 class FireDistinguisher:
@@ -98,7 +98,7 @@ class FireDistinguisher:
 
         # Machine Learning
         self.vis_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/visible_yolov11n/best_rgb.engine'
-        self.ir_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/infrared_yolov11n/best_ir.engine'
+        self.ir_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/infrared_yolov11n/v1/best_ir.engine'
         self.meta_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/meta-learner/fire_meta_learner.pkl'
         self.models = ml.initialize_fire_models(vis_path=self.vis_path, ir_path=self.ir_path, meta_path=self.meta_path)
 
@@ -121,7 +121,7 @@ class FireDistinguisher:
         self.last_obj_y = None # Last known object y-coordinate, used for anti-blink persistence (hold position if briefly lost)
         
         # Begin scanning immediately on startup assuming no fires
-        self.mount.start_scan(pan_sweep_time=10, speed=1.5)
+        self.mount.start_scan(pan_sweep_time=5, speed=1.5) 
 
     def _on_tick(self):
         # Perform the following on every 25Hz tick
@@ -132,145 +132,150 @@ class FireDistinguisher:
         ml_results = ml.process_fused_detection(
             snapshot.reg.frame,
             snapshot.ir.frame,
+            snapshot.ir.temp_frame, 
             self.models,
             returnAnnotatedImg=False
         )
+        self.web.set_fire_subtext("Hello World!")
         
         # Pan-Tilt Tracking
-        (obj_x, obj_y), (cx, cy), fire_detected = self.obj_finder.update(ml_results, fire_coverage_threshold_min=0.01, fire_coverage_threshold_max=0.1) # aquire centroid and fire boolean from ML results
+        (obj_x, obj_y), (cx, cy), fire_detected = self.obj_finder.update(ml_results, fire_coverage_threshold_min=0.02, fire_coverage_threshold_max=0.1) # aquire centroid and fire boolean from ML results
 
         now = time.perf_counter()
 
         # If fire detected, track it with PID; else handle potential loss and resume scan if lost for a while
-        if fire_detected:
+        self.web.set_fire_detected(ml_results["meta_decision"]["fire_detection_boolean"])
+        
+        # if fire_detected:
 
-            print("FIRE True")
-            self.player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/discord_join_sfx.wav", volume=0.0)
-            # Record last valid detection time for anti-blink persistence
-            self.last_detection_time = now
-            self.last_obj_x = obj_x
-            self.last_obj_y = obj_y
+        #     print("FIRE True")
+        #     self.player.play("/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/discord_join_sfx.wav", volume=0.05)
+        #     # Record last valid detection time for anti-blink persistence
+        #     self.last_detection_time = now
+        #     self.last_obj_x = obj_x
+        #     self.last_obj_y = obj_y
 
-            # If scan is active, stop it and enter tracking
-            if self.mount.is_scanning():
-                print("Fire detected - stopping scan, attempting to track.")
-                print(
-                    "\n****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n",
-                    "****************************************************************************************\n"
-                )
+        #     # If scan is active, stop it and enter tracking
+        #     if self.mount.is_scanning():
+        #         print("Fire detected - stopping scan, attempting to track.")
+        #         print(
+        #             "\n****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n",
+        #             "****************************************************************************************\n"
+        #         )
 
-                self.mount.stop_scan()
-                self.mount.set_speeds(speed=5)
-                # Reinitialize PID state to prevent integral and derivative windup from scan
-                self.pid_pan.initialize(difference_equation=True) 
-                self.pid_tilt.initialize(difference_equation=True)
-                self.track_end_time = None # Currently tracking so reset any previous track loss timer
+        #         self.mount.stop_scan()
+        #         self.mount.set_speeds(speed=5)
+        #         # Reinitialize PID state to prevent integral and derivative windup from scan
+        #         self.pid_pan.initialize(difference_equation=True) 
+        #         self.pid_tilt.initialize(difference_equation=True)
+        #         self.track_end_time = None # Currently tracking so reset any previous track loss timer
 
-            # If we were previously "not tracking" due to a brief dropout,
-            # reacquire smoothly WITHOUT treating it as a full loss
-            if not self.isTracking:
-                print("Fire reacquired - continuing tracking.")
-                self.isTracking = True
-                self.track_end_time = None
+        #     # If we were previously "not tracking" due to a brief dropout,
+        #     # reacquire smoothly WITHOUT treating it as a full loss
+        #     if not self.isTracking:
+        #         print("Fire reacquired - continuing tracking.")
+        #         self.isTracking = True
+        #         self.track_end_time = None
 
-            # Calculate pan/tilt errors in pixels
-            dx_px = obj_x - cx
-            dy_px = obj_y - cy
+        #     # Calculate pan/tilt errors in pixels
+        #     dx_px = obj_x - cx
+        #     dy_px = obj_y - cy
 
-            # Convert pixel errors to angular errors in degrees
-            error_pan = PAN_ERROR_SIGN * pixel_to_angle(dx_px, HALF_HFOV_RAD, FRAME_W)
-            error_tilt = TILT_ERROR_SIGN * pixel_to_angle(dy_px, HALF_VFOV_RAD, FRAME_H)
+        #     # Convert pixel errors to angular errors in degrees
+        #     error_pan = PAN_ERROR_SIGN * pixel_to_angle(dx_px, HALF_HFOV_RAD, FRAME_W)
+        #     error_tilt = TILT_ERROR_SIGN * pixel_to_angle(dy_px, HALF_VFOV_RAD, FRAME_H)
 
-            # Produce new pan/tilt angle updates (P-only for now)
-            pan_update = self.pid_pan.update(error_pan, difference_equation=True)
-            tilt_update = self.pid_tilt.update(error_tilt, difference_equation=True)
+        #     # Produce new pan/tilt angle updates (P-only for now)
+        #     pan_update = self.pid_pan.update(error_pan, difference_equation=True)
+        #     tilt_update = self.pid_tilt.update(error_tilt, difference_equation=True)
 
-            # Calculate and set new pan/tilt positions
-            new_pan = self.mount.get_pan() + pan_update
-            new_tilt = self.mount.get_tilt() + tilt_update
+        #     # Calculate and set new pan/tilt positions
+        #     new_pan = self.mount.get_pan() + pan_update
+        #     new_tilt = self.mount.get_tilt() + tilt_update
 
-            # Meta-logging for debugging and analysis
-            print(f"Fire Located at (x={obj_x}, y={obj_y}) with confidence {ml_results['meta_decision']['confidence']:.2f}")
-            print(f"Pixel error - dx: {dx_px} px, dy: {dy_px} px")
-            print(f"Tracking fire - pan error: {error_pan:.2f} deg, tilt error: {error_tilt:.2f} deg")
-            print(f"Updating mount position - new pan: {self.mount.get_pan():.2f} deg, new tilt: {self.mount.get_tilt():.2f} deg")
-            print(f"PID outputs - pan update: {pan_update:.2f} deg, tilt update: {tilt_update:.2f} deg")
-            print(f"FIRE True")
+        #     # Meta-logging for debugging and analysis
+        #     print(f"Fire Located at (x={obj_x}, y={obj_y}) with confidence {ml_results['meta_decision']['confidence']:.2f}")
+        #     print(f"Pixel error - dx: {dx_px} px, dy: {dy_px} px")
+        #     print(f"Tracking fire - pan error: {error_pan:.2f} deg, tilt error: {error_tilt:.2f} deg")
+        #     print(f"Updating mount position - new pan: {self.mount.get_pan():.2f} deg, new tilt: {self.mount.get_tilt():.2f} deg")
+        #     print(f"PID outputs - pan update: {pan_update:.2f} deg, tilt update: {tilt_update:.2f} deg")
+        #     print(f"FIRE True")
 
-            # Update mount position
-            self.mount.set_position(new_pan, new_tilt)
+        #     # Update mount position
+        #     self.mount.set_position(new_pan, new_tilt)
 
-        else:
-            # No detection THIS tick, but do not instantly declare target lost
-            recently_seen = ( # Check if we have seen a valid detection within the timeout window
-                self.last_detection_time is not None and
-                (now - self.last_detection_time) <= self.track_loss_timeout
-            )
+        # else:
+        #     # No detection THIS tick, but do not instantly declare target lost
+        #     recently_seen = ( # Check if we have seen a valid detection within the timeout window
+        #         self.last_detection_time is not None and
+        #         (now - self.last_detection_time) <= self.track_loss_timeout
+        #     )
 
-            if self.isTracking and recently_seen:
-                # Anti-detection blink hold: remain in tracking mode and hold current mount position
-                # This prevents target blinking from toggling tracking state.
-                time_since_seen = now - self.last_detection_time
-                print(f"No fire detected this tick - holding track ({time_since_seen:.2f}s since last detection).")
+        #     if self.isTracking and recently_seen:
+        #         # Anti-detection blink hold: remain in tracking mode and hold current mount position
+        #         # This prevents target blinking from toggling tracking state.
+        #         time_since_seen = now - self.last_detection_time
+        #         print(f"No fire detected this tick - holding track ({time_since_seen:.2f}s since last detection).")
 
-            elif self.isTracking and not recently_seen:
-                # True loss: only now declare the target lost
-                self.isTracking = False
-                self.track_end_time = now
-                print(f"Lost fire - resuming scan after 3 seconds. "
-                    f"(No detection for {now - self.last_detection_time:.2f}s)")
+        #     elif self.isTracking and not recently_seen:
+        #         # True loss: only now declare the target lost
+        #         self.isTracking = False
+        #         self.track_end_time = now
+        #         print(f"Lost fire - resuming scan after 3 seconds. "
+        #             f"(No detection for {now - self.last_detection_time:.2f}s)")
 
-            # Resume scan only after prolonged true loss
-            if (
-                (not self.mount.is_scanning())         # We are currently tracking or just stopped tracking
-                and (not self.isTracking)              # We are currently not tracking (already past anti-blink)
-                and self.track_end_time is not None    # We have started the track loss timer
-                and (now - self.track_end_time > 3.0) # Wait 3 seconds after loss before resuming scan, to prevent rapid toggling if target is near the edge of detection
-            ):
-                print(
-                    "\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
-                    "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-                )
+        #     # Resume scan only after prolonged true loss
+        #     if (
+        #         (not self.mount.is_scanning())         # We are currently tracking or just stopped tracking
+        #         and (not self.isTracking)              # We are currently not tracking (already past anti-blink)
+        #         and self.track_end_time is not None    # We have started the track loss timer
+        #         and (now - self.track_end_time > 3.0) # Wait 3 seconds after loss before resuming scan, to prevent rapid toggling if target is near the edge of detection
+        #     ):
+        #         print(
+        #             "\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+        #             "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        #         )
 
-                # Reset states for next tracking phase
-                self.track_end_time = None
-                self.last_detection_time = None
-                self.last_obj_x = None
-                self.last_obj_y = None
+        #         # Reset states for next tracking phase
+        #         self.track_end_time = None
+        #         self.last_detection_time = None
+        #         self.last_obj_x = None
+        #         self.last_obj_y = None
 
-                print("No fire detected - starting scan.")
-                self.mount.start_scan(pan_sweep_time=10, speed=1.5) # Starts scan returning to bottom corner
+        #         print("No fire detected - starting scan.")
+        #         self.mount.start_scan(pan_sweep_time=10, speed=1.5) # Starts scan returning to bottom corner
+        
 
         # Pass ML results to Web Stream
         self.web.update_ml_results(ml_results)

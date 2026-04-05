@@ -98,6 +98,28 @@ setInterval(() => {
   el.textContent = `${ageSec.toFixed(1)}s ago`;
 }, 200);
 
+// Update Detection Status
+function updateFireStatus(fireDetected) {
+  const status = document.getElementById("fire-status");
+  if (!status) return;
+
+  status.classList.remove("fire", "no-fire", "fire-unknown");
+
+  if (fireDetected === true) {
+    status.textContent = "Fire Detected";
+    status.classList.add("fire");
+  } else if (fireDetected === false) {
+    status.textContent = "No Fire Detected";
+    status.classList.add("no-fire");
+  } else {
+    status.textContent = "Unknown";
+    status.classList.add("fire-unknown");
+  }
+}
+function updateFireSubtext(text) {
+  const sub = document.getElementById("fire-subtext")
+  sub.textContent = text ?? "";
+}
 
 // -------------------------
 // Chart.js setup
@@ -498,6 +520,10 @@ function updateClip(labelId, valueId, val) {
 es.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
   if (msg.t != null) lastMsgUnix = Number(msg.t);
+
+  // Update fire status
+  updateFireStatus(msg.fire_detected);
+  updateFireSubtext(msg.fire_subtext);
 
   // Update status text
   document.getElementById("status").textContent = msg.status;

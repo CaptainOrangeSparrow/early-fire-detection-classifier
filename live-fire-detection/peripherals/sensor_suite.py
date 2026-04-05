@@ -59,6 +59,9 @@ class LatestTempHum:
 class IrFramePacket:
     t: float
     frame: Optional[np.ndarray]
+    temp_frame: Optional[np.ndarray]
+    ema_frame: Optional[np.ndarray] = None
+    ema_temp_frame: Optional[np.ndarray] = None
     tmin: Optional[float] = None
     tmax: Optional[float] = None
     tavg: Optional[float] = None
@@ -73,9 +76,12 @@ class IrFramePacket:
 class LatestIRFrame:
     def __init__(self):
         self._lock = threading.Lock()
-        self._pkt = IrFramePacket(t=0.0, frame=None)
+        self._pkt = IrFramePacket(t=0.0, frame=None, temp_frame=None)
 
     def set(self, frame: np.ndarray, t: float,
+            temp_frame: np.ndarray, # Absolute temperatures
+            ema_frame: np.ndarray = None,
+            ema_temp_frame: np.ndarray = None,
             tmin: Optional[float] = None,
             tmax: Optional[float] = None,
             tavg: Optional[float] = None,
@@ -89,6 +95,8 @@ class LatestIRFrame:
         with self._lock:
             self._pkt = IrFramePacket(
                 t=t, frame=frame,
+                temp_frame=temp_frame,
+                ema_frame=ema_frame, ema_temp_frame=ema_temp_frame,
                 tmin=tmin, tmax=tmax, tavg=tavg, tcenter=tcenter,
                 colormap=colormap,
                 sat_above=sat_above, sat_below=sat_below, norm_max=norm_max, norm_min=norm_min,
@@ -162,9 +170,15 @@ def ir_camera_worker(cam: IRCamera, latest: LatestIRFrame, stop_evt: threading.E
         t = time.perf_counter()
         tmin, tmax, tavg, tcenter = cam.get_temp_stats()  # this method to IRCamera
         norm_min, norm_max, sat_below, sat_above = cam.get_fixed_norm_stats()
+        temp_frame = cam.get_raw_thermal_frame()
+        ema_frame = cam.get_ema_thermal_bgr()
+        ema_temp_frame = cam.get_ema_thermal_temps()
         latest.set(
             frame=f,
             t=t,
+            temp_frame=temp_frame,
+            ema_frame=ema_frame,
+            ema_temp_frame=ema_temp_frame,
             tmin=tmin,
             tmax=tmax,
             tavg=tavg,
@@ -324,6 +338,9 @@ class SensorSuite:
             ir=IrFramePacket(
                 t=ir_pkt.t,
                 frame=None if ir_pkt.frame is None else ir_pkt.frame.copy(),
+                temp_frame=None if ir_pkt.temp_frame is None else ir_pkt.temp_frame.copy(),
+                ema_frame=None if ir_pkt.ema_frame is None else ir_pkt.ema_frame.copy(),
+                ema_temp_frame=None if ir_pkt.ema_temp_frame is None else ir_pkt.ema_temp_frame.copy(),
                 tmin=ir_pkt.tmin,
                 tmax=ir_pkt.tmax,
                 tavg=ir_pkt.tavg,
