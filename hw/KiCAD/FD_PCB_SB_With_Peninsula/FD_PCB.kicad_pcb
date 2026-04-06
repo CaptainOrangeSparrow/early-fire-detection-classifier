@@ -44528,8 +44528,8 @@
 			(justify left bottom mirror)
 		)
 	)
-	(gr_text "SB_GND"
-		(at 208.026 82.804 0)
+	(gr_text "SB_\nGND"
+		(at 208.0768 84.074 0)
 		(layer "B.SilkS")
 		(uuid "4f88c99d-d579-43fb-a3a5-bb0088476114")
 		(effects
