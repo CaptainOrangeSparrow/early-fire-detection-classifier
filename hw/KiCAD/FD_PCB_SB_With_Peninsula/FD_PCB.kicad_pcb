@@ -13102,7 +13102,7 @@
 	(footprint "ECE445L:MountingHole_4_40"
 		(layer "F.Cu")
 		(uuid "5c8d2a7c-7f6d-40b3-8c23-805e8f4a0fbc")
-		(at 124.792 26.162)
+		(at 125 26.5)
 		(descr "Mounting Hole 0.125in")
 		(tags "mounting hole 0.125in 4_40")
 		(property "Reference" "H18"
@@ -21947,7 +21947,7 @@
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J7"
-			(at -0.3048 4.6736 0)
+			(at 0.1024 4.5596 0)
 			(layer "F.SilkS")
 			(uuid "6ecb05cb-3135-4c2c-b52f-7130afa0a721")
 			(effects
@@ -31554,7 +31554,7 @@
 		(descr "Through hole straight pin header, 1x07, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x07 2.54mm single row")
 		(property "Reference" "J6"
-			(at 0 -2.33 90)
+			(at 1.4608 0.0076 180)
 			(layer "F.SilkS")
 			(uuid "912d07bd-c0c1-4584-a513-c6991ae335dc")
 			(effects
@@ -34329,7 +34329,7 @@
 		(descr "wire loop with bead as test point, loop diameter 3.5mm, hole diameter 1.4mm")
 		(tags "test point wire loop bead")
 		(property "Reference" "TP8"
-			(at 0.7112 2.4892 90)
+			(at 0.2924 2.6408 90)
 			(layer "F.SilkS")
 			(uuid "c9148ecf-e4b4-470b-ba85-362ce50224cb")
 			(effects
@@ -36943,7 +36943,7 @@
 	(footprint "ECE445L:MountingHole_4_40"
 		(layer "F.Cu")
 		(uuid "f99e7dc8-3f89-43e3-a45d-98d0fcfca567")
-		(at 113.792 26.162)
+		(at 114 26.5)
 		(descr "Mounting Hole 0.125in")
 		(tags "mounting hole 0.125in 4_40")
 		(property "Reference" "H17"
@@ -39521,9 +39521,9 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "+5V"
-		(at 28.448 86.106 90)
-		(layer "F.SilkS" knockout)
+	(gr_text "5V"
+		(at 28.448 85.09 90)
+		(layer "F.SilkS")
 		(uuid "a4738abb-7416-4c4e-b9bb-ee5f9f5b8a4b")
 		(effects
 			(font
@@ -39594,8 +39594,8 @@
 		)
 	)
 	(gr_text "GND"
-		(at 28.4996 82.944 90)
-		(layer "F.SilkS" knockout)
+		(at 28.448 82.944 90)
+		(layer "F.SilkS")
 		(uuid "b530cb62-f70b-4726-b6f2-953cbf4d9381")
 		(effects
 			(font
@@ -39729,6 +39729,18 @@
 		(at 117.094 55.626 0)
 		(layer "F.SilkS")
 		(uuid "d50707c4-7853-4e6c-b85e-ce0bd4c39517")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
+	(gr_text "EXT_PWR"
+		(at 32.512 85.598 90)
+		(layer "F.SilkS" knockout)
+		(uuid "d7488f53-8469-4491-bdc1-8a09e21cca4e")
 		(effects
 			(font
 				(size 1 1)
@@ -40076,39 +40088,6 @@
 	(dimension
 		(type aligned)
 		(layer "Cmts.User")
-		(uuid "10322f20-f06e-433d-8aef-2f5b67a725e4")
-		(pts
-			(xy 124.792 26.162) (xy 113.792 26.162)
-		)
-		(height 6.604)
-		(gr_text "11.0000 mm"
-			(at 119.292 18.408 0)
-			(layer "Cmts.User")
-			(uuid "10322f20-f06e-433d-8aef-2f5b67a725e4")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(format
-			(prefix "")
-			(suffix "")
-			(units 3)
-			(units_format 1)
-			(precision 4)
-		)
-		(style
-			(thickness 0.1)
-			(arrow_length 1.27)
-			(text_position_mode 0)
-			(extension_height 0.58642)
-			(extension_offset 0.5) keep_text_aligned)
-	)
-	(dimension
-		(type aligned)
-		(layer "Cmts.User")
 		(uuid "199cb28c-f5bf-407b-a5c6-b0bb96f4c47b")
 		(pts
 			(xy 107.5 36) (xy 107.5 74)
@@ -40283,39 +40262,6 @@
 			(at 108.25 20.44 0)
 			(layer "Cmts.User")
 			(uuid "300c001c-d758-4c45-bbd8-f115fd12d9ee")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(format
-			(prefix "")
-			(suffix "")
-			(units 3)
-			(units_format 1)
-			(precision 4)
-		)
-		(style
-			(thickness 0.1)
-			(arrow_length 1.27)
-			(text_position_mode 0)
-			(extension_height 0.58642)
-			(extension_offset 0.5) keep_text_aligned)
-	)
-	(dimension
-		(type aligned)
-		(layer "Cmts.User")
-		(uuid "3576e80a-a659-4c1d-89f2-d4c935f793b8")
-		(pts
-			(xy 19 84.7) (xy 52 84.7)
-		)
-		(height 5.47)
-		(gr_text "33.0000 mm"
-			(at 35.5 89.02 0)
-			(layer "Cmts.User")
-			(uuid "3576e80a-a659-4c1d-89f2-d4c935f793b8")
 			(effects
 				(font
 					(size 1 1)
@@ -40868,15 +40814,15 @@
 	(dimension
 		(type aligned)
 		(layer "Cmts.User")
-		(uuid "8737703d-5321-4eef-9a2c-09158518a56e")
+		(uuid "89ee7305-1952-47b7-bc7c-91e9cbbe5147")
 		(pts
-			(xy 52 82.5) (xy 106 82.5)
+			(xy 112 23) (xy 112 36)
 		)
-		(height 7.67)
-		(gr_text "54.0000 mm"
-			(at 79 89.02 0)
+		(height 10.146)
+		(gr_text "13.0000 mm"
+			(at 100.704 29.5 90)
 			(layer "Cmts.User")
-			(uuid "8737703d-5321-4eef-9a2c-09158518a56e")
+			(uuid "89ee7305-1952-47b7-bc7c-91e9cbbe5147")
 			(effects
 				(font
 					(size 1 1)
@@ -40901,15 +40847,15 @@
 	(dimension
 		(type aligned)
 		(layer "Cmts.User")
-		(uuid "89ee7305-1952-47b7-bc7c-91e9cbbe5147")
+		(uuid "9379c362-8046-4553-99aa-f0d153d14dd1")
 		(pts
-			(xy 112 23) (xy 112 36)
+			(xy 125 26.5) (xy 110.5 26.5)
 		)
-		(height 10.146)
-		(gr_text "13.0000 mm"
-			(at 100.704 29.5 90)
+		(height 11.26)
+		(gr_text "14.5000 mm"
+			(at 117.75 14.09 0)
 			(layer "Cmts.User")
-			(uuid "89ee7305-1952-47b7-bc7c-91e9cbbe5147")
+			(uuid "9379c362-8046-4553-99aa-f0d153d14dd1")
 			(effects
 				(font
 					(size 1 1)
@@ -41372,6 +41318,39 @@
 			(at 120.75 103.752 0)
 			(layer "Cmts.User")
 			(uuid "f40a4272-d05e-4f08-b8f3-015f06994119")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(format
+			(prefix "")
+			(suffix "")
+			(units 3)
+			(units_format 1)
+			(precision 4)
+		)
+		(style
+			(thickness 0.1)
+			(arrow_length 1.27)
+			(text_position_mode 0)
+			(extension_height 0.58642)
+			(extension_offset 0.5) keep_text_aligned)
+	)
+	(dimension
+		(type aligned)
+		(layer "Cmts.User")
+		(uuid "f7eed15a-563f-4757-a309-b2c7c4214766")
+		(pts
+			(xy 125 26.5) (xy 114 26.5)
+		)
+		(height 6.18)
+		(gr_text "11.0000 mm"
+			(at 119.5 19.17 0)
+			(layer "Cmts.User")
+			(uuid "f7eed15a-563f-4757-a309-b2c7c4214766")
 			(effects
 				(font
 					(size 1 1)
