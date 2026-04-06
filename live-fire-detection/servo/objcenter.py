@@ -39,7 +39,7 @@ class ObjCenter:
             print(f"Box Area: {area_box}, Box Coverage: {area_box / self.frame_area:.2%}, Track Decision: {area_box <= self.frame_area * fire_coverage_threshold_max and area_box >= self.frame_area * fire_coverage_threshold_min}")
 
         # Extract centroid of detected fire box if fire is detected
-        if ((fire_detected) and (area_box <= self.frame_area * fire_coverage_threshold_max) and (area_box >= self.frame_area * fire_coverage_threshold_min)):
+        if ((fire_detected) and ((area_box <= self.frame_area * fire_coverage_threshold_max) and (area_box >= self.frame_area * fire_coverage_threshold_min))):
             
             # Cast the box center to int for pixel coordinates
             obj_x = int((x1 + x2) / 2.0)

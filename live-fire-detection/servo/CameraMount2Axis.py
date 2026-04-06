@@ -1,7 +1,7 @@
 import threading
 import time
 import Jetson.GPIO as GPIO
-from . import servo
+import servo
 
 
 class CameraMount2Axis:
@@ -43,7 +43,7 @@ class CameraMount2Axis:
 
         # Default limits
         pan_limits  = pan_limits  or (0.0,  180.0)
-        tilt_limits = tilt_limits or (90.0, 180.0)
+        tilt_limits = tilt_limits or (0.0, 135.0)
 
         # Servo instances (each has its own worker thread)
         self.pan = servo.Servo(
@@ -56,6 +56,8 @@ class CameraMount2Axis:
 
         self.tilt = servo.Servo(
             pin=tilt_pin,
+            min_duty=5.00,  # 0° corresponds to 2.5% duty cycle
+            max_duty=15.00, # 180° corresponds to 12.5
             transition_type=transition_type,
             transition_speed=transition_speed,
             min_limit=tilt_limits[0],
@@ -104,23 +106,45 @@ class CameraMount2Axis:
     # Public API — Position Control
     # ==========================================================================
 
-    def set_pan(self, angle):
+    def set_pan(self, angle, transition_type: str | None = None, speed: float | int | None = None):
         with self._lock:
             self._target_pan = angle
             self._update_event.set()
 
-    def set_tilt(self, angle):
+            if transition_type is not None:
+                self.pan.set_transition(transition_type)
+
+            if speed is not None:
+                self.pan.set_speed(speed)
+
+    def set_tilt(self, angle, transition_type: str | None = None, speed: float | int | None = None):
         with self._lock:
             self._target_tilt = angle
             self._update_event.set()
 
-    def set_position(self, pan_angle, tilt_angle):
+            if transition_type is not None:
+                self.tilt.set_transition(transition_type)
+
+            if speed is not None:
+                self.tilt.set_speed(speed)
+
+    def set_position(self, pan_angle, tilt_angle, transition_type: str | None = None, speed: float | int | None = None):
         with self._lock:            
             self._target_pan = max(self.pan.min_limit, min(self.pan.max_limit, pan_angle))
             
             self._target_tilt = max(self.tilt.min_limit, min(self.tilt.max_limit, tilt_angle))
             
+            if transition_type is not None:
+                self.set_transitions(transition_type)
+
+            if speed is not None:
+                self.set_speeds(speed)
+
             self._update_event.set()
+
+    def set_transitions(self, transition_type: str):
+        self.pan.set_transition(transition_type)
+        self.tilt.set_transition(transition_type)
 
     def set_speeds(self, speed: float | int = None, pan_speed: float | int = None, tilt_speed: float | int = None):
         if speed is not None: 
@@ -217,6 +241,10 @@ class CameraMount2Axis:
             tilt_positions.append(t)
             t += tilt_step
 
+        tilt_positions.reverse()
+
+        print(f"Tilt Positions: {', '.join(f'{t:.1f}°' for t in tilt_positions)}")
+
         pause_time = 0.3
 
         print(f"[SCAN] Smooth row scan: {len(tilt_positions)} rows")
@@ -227,8 +255,10 @@ class CameraMount2Axis:
                 if not self._scan_running:
                     return
 
+
+
             # snap to start corner
-            self.set_position(pan_min, tilt_positions[0])
+            self.set_position(pan_min, tilt_positions[-1])
             time.sleep(1.0)
 
             direction = 1

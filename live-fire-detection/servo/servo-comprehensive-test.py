@@ -55,19 +55,20 @@ def test_linear_transitions(mount):
         print(f"\n  Speed: {speed} deg/tick")
         
         # Set transition type and speed
-        mount.pan.set_angle(90, transition_type='linear', speed=speed)
-        mount.tilt.set_angle(90, transition_type='linear', speed=speed)
+
+        mount.set_pan(90, transition_type='linear', speed=speed)
+        mount.set_tilt(90, transition_type='linear', speed=speed)
         time.sleep(0.5)
         
         # Sweep left to right
         print(f"    → Sweeping pan left to right at speed {speed}")
-        mount.pan.set_angle(0, transition_type='linear', speed=speed)
+        mount.set_pan(0, transition_type='linear', speed=speed)
         time.sleep(3)
         
-        mount.pan.set_angle(180, transition_type='linear', speed=speed)
+        mount.set_pan(180, transition_type='linear', speed=speed)
         time.sleep(3)
         
-        mount.pan.set_angle(90, transition_type='linear', speed=speed)
+        mount.set_tilt(90, transition_type='linear', speed=speed)
         time.sleep(2)
 
 def test_s_curve_transitions(mount):
@@ -77,28 +78,23 @@ def test_s_curve_transitions(mount):
     mount.center()
     time.sleep(1)
     
-    speeds = [3.0, 7.0, 9.0]
+    speeds = [8.0, 6.0, 3.0]
     
+    mount.set_transitions('s-curve')
     for speed in speeds:
+        mount.set_speeds(speed)
         print(f"\n  Speed: {speed} deg/tick")
         
         # Diagonal movement with S-curve
         print(f"    → Diagonal sweep (s-curve)")
-        mount.pan.set_angle(0, transition_type='s-curve', speed=speed)
-        mount.tilt.set_angle(0, transition_type='s-curve', speed=speed)
+        mount.set_position(0, 0)
         time.sleep(4)
         
-        mount.pan.set_angle(180, transition_type='s-curve', speed=speed)
-        mount.tilt.set_angle(180, transition_type='s-curve', speed=speed)
+        mount.set_position(180, 180)
         time.sleep(4)
         
-        mount.pan.set_angle(0, transition_type='s-curve', speed=speed)
-        mount.tilt.set_angle(0, transition_type='s-curve', speed=speed)
-        
-        mount.pan.set_angle(90, transition_type='s-curve', speed=speed)
-        mount.tilt.set_angle(90, transition_type='s-curve', speed=speed)
-        time.sleep(4)
-
+        mount.set_position(90, 90)
+        time.sleep(3)
 
         mount.center()
         time.sleep(3)
@@ -135,23 +131,21 @@ def test_ease_in_out_quad(mount):
     mount.center()
     time.sleep(1)
     
-    speeds = [3.0, 5.0, 7.0]
+    speeds = [20.0, 15.0, 10.0]
     
     for speed in speeds:
         print(f"\n  Speed: {speed} deg/tick")
         
         print(f"    → Full sweep with ease-in-out")
-        mount.pan.set_angle(0, transition_type='ease-in-out-quad', speed=speed)
-        mount.tilt.set_angle(0, transition_type='ease-in-out-quad', speed=speed)
+        mount.set_position(0, 0, transition_type='ease-in-out-quad', speed=speed)
+        time.sleep(4)
+
+        mount.set_position(180, 180, transition_type='ease-in-out-quad', speed=speed)
+        time.sleep(4)
+
+        mount.set_position(90, 90, transition_type='ease-in-out-quad', speed=speed)
         time.sleep(3)
-        
-        mount.pan.set_angle(180, transition_type='ease-in-out-quad', speed=speed)
-        mount.tilt.set_angle(180, transition_type='ease-in-out-quad', speed=speed)
-        time.sleep(3)
-        
-        mount.pan.set_angle(90, transition_type='ease-in-out-quad', speed=speed)
-        mount.tilt.set_angle(90, transition_type='ease-in-out-quad', speed=speed)
-        time.sleep(2)
+
 
 def test_sine_transitions(mount):
     """Test sine easing transitions"""
@@ -160,22 +154,20 @@ def test_sine_transitions(mount):
     mount.center()
     time.sleep(1)
     
-    speeds = [3.0, 5.0, 7.0]
-    
+    speeds = [20, 15.0, 7.0]
+    mount.set_transitions('sine')
     for speed in speeds:
+        mount.set_speeds(speed)
         print(f"\n  Speed: {speed} deg/tick")
         
         print(f"    → Diagonal sweep with sine easing")
-        mount.pan.set_angle(0, transition_type='sine', speed=speed)
-        mount.tilt.set_angle(0, transition_type='sine', speed=speed)
+        mount.set_position(0, 0)
         time.sleep(4)
         
-        mount.pan.set_angle(180, transition_type='sine', speed=speed)
-        mount.tilt.set_angle(180, transition_type='sine', speed=speed)
+        mount.set_position(180, 180)
         time.sleep(4)
         
-        mount.pan.set_angle(90, transition_type='sine', speed=speed)
-        mount.tilt.set_angle(90, transition_type='sine', speed=speed)
+        mount.set_position(90, 90)
         time.sleep(3)
 
 def test_transition_comparison(mount):

@@ -32,8 +32,8 @@ PAN_PIN  = 33
 TILT_PIN = 32
 
 # Mount angle limits
-PAN_LIMITS  = (0.0,  180.0)
-TILT_LIMITS = (90.0, 180.0)
+PAN_LIMITS  = (0.0, 180.0)
+TILT_LIMITS = (0.0, 135.0)
 
 """
 Tuning order:
@@ -44,12 +44,12 @@ Tuning order:
 """
 
 # PID gains
-PAN_KP,  PAN_KI,  PAN_KD  = 0.25, 0.0, 0.0
-TILT_KP, TILT_KI, TILT_KD = 0.6, 0.0, 0.0
+PAN_KP,  PAN_KI,  PAN_KD  = 0.2, 0.0, 0.0
+TILT_KP, TILT_KI, TILT_KD = 0.15, 0.0, 0.0
 
 # Error sign convention for positve angular error corrections
 PAN_ERROR_SIGN  = -1 # positive because pixel x increases to the right, and positive pan correction should move the camera right
-TILT_ERROR_SIGN = -1 # negative because pixel y increases downwards, but positive tilt correction should move the camera up
+TILT_ERROR_SIGN = +1 # negative because pixel y increases downwards, but positive tilt correction should move the camera up
 
 
 def pixel_to_angle(pixel_offset: float, half_fov_rad: float, frame_dim: int) -> float:
@@ -80,8 +80,8 @@ def build_mount() -> CameraMount2Axis:
     return CameraMount2Axis(
         pan_pin=PAN_PIN,
         tilt_pin=TILT_PIN,
-        transition_type='sine',
-        transition_speed=1.0,
+        transition_type='s-curve',
+        transition_speed=5.0,
         pan_limits=PAN_LIMITS,
         tilt_limits=TILT_LIMITS,
         update_rate_hz=50.0

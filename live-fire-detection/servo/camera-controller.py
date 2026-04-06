@@ -12,24 +12,19 @@ from CameraMount2Axis import CameraMount2Axis
 
 class CameraController:
     def __init__(self, pan_pin, tilt_pin):
-        # Tilt between 90 and 180
-        # Pan defaults to 0-180 (pass None or (0,180))
-        
         self.camera = CameraMount2Axis(
             pan_pin=pan_pin,
             tilt_pin=tilt_pin,
             transition_type='linear',
             transition_speed=2.0,
-            pan_limits=(0.0, 180.0),   # Full range
-            tilt_limits=(90.0, 180.0)  # Restricted range to prevent collision
+            pan_limits=(0.0, 180.0),
+            tilt_limits=(0.0, 135)
         )
-        
-        # Control settings
-        self.increment = 5.0  # Default step size for WASD
+
+        self.increment = 5.0
         self.transition_speed = 2.0
         self.transition_type = 'linear'
-        
-        # Available transition types
+
         self.transition_types = [
             'instant',
             'linear',
@@ -38,57 +33,50 @@ class CameraController:
             'ease-in-out-quad',
             'sine'
         ]
-        
-        # Saved positions (can be customized)
+
         self.saved_positions = {
-            '1': (90, 135),  # Center-ish (adjusted for tilt limits)
-            '2': (45, 135),  # Left
-            '3': (135, 135), # Right
-            '4': (90, 100),  # Up (close to 90 limit)
-            '5': (90, 170),  # Down (close to 180 limit)
+            '1': (50, 102.5),
+            '2': (45, 135),
+            '3': (135, 135),
+            '4': (90, 100),
+            '5': (90, 170),
         }
-        
+
         self.running = True
         self.last_command = "Ready"
-    
-    # ... [Include existing helper methods: _clear_screen, _refresh_display, _print_status, _get_key, _get_input] ...
-    # (Truncated for brevity, they remain the same as provided)
 
     def _clear_screen(self):
         """Clear terminal screen"""
         print('\033[2J\033[H', end='')
-    
+
     def _refresh_display(self):
         """Refresh the display - called after each command"""
         self._clear_screen()
         self._print_status()
-    
+
     def _print_status(self):
         """Print current status and controls"""
         print("=" * 70)
         print("  CAMERA MOUNT CONTROLLER")
         print("=" * 70)
         print()
-        
-        # Current position
+
         print(f"📍 Position:")
-        print(f"   Pan:  {self.camera.pan.target_angle:6.1f}° (current: {self.camera.pan.current_angle:6.1f}°)")
-        print(f"   Tilt: {self.camera.tilt.target_angle:6.1f}° (current: {self.camera.tilt.current_angle:6.1f}°)")
+        print(f"   Pan:  {self.camera.pan.get_angle():6.1f}°, (duty: {self.camera.pan.current_duty:.2f}%)")
+        print(f"   Tilt: {self.camera.tilt.get_angle():6.1f}°, (duty: {self.camera.tilt.current_duty:.2f}%)")
         print()
-        
-        # Settings
+
         print(f"⚙️  Settings:")
         print(f"   Transition: {self.transition_type}")
         print(f"   Speed:      {self.transition_speed:.1f}°/step")
         print(f"   Increment:  {self.increment:.1f}°")
-        print(f"   Limits:     Pan(0-180), Tilt(90-180)")
+        print(f"   Limits:     Pan({self.camera.pan.min_limit:.0f}-{self.camera.pan.max_limit:.0f}), "
+              f"Tilt({self.camera.tilt.min_limit:.0f}-{self.camera.tilt.max_limit:.0f})")
         print()
-        
-        # Last command
+
         print(f"💬 Last: {self.last_command}")
         print()
-        
-        # Controls
+
         print("─" * 70)
         print("CONTROLS:")
         print("─" * 70)
@@ -123,7 +111,7 @@ class CameraController:
             return ch
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    
+
     def _get_input(self, prompt):
         """Get user input with echo restored"""
         fd = sys.stdin.fileno()
@@ -138,48 +126,45 @@ class CameraController:
         """Handle WASD movement"""
         current_pan = self.camera.pan.target_angle
         current_tilt = self.camera.tilt.target_angle
-        
+
         if key in ['a', 'A', '\x1b[D']:  # Left
-            new_pan = max(0, current_pan - self.increment)
+            new_pan = max(self.camera.pan.min_limit, current_pan - self.increment)
             self.camera.set_pan(new_pan)
             self.last_command = f"Pan left to {new_pan:.1f}°"
-        
+
         elif key in ['d', 'D', '\x1b[C']:  # Right
-            new_pan = min(180, current_pan + self.increment)
+            new_pan = min(self.camera.pan.max_limit, current_pan + self.increment)
             self.camera.set_pan(new_pan)
             self.last_command = f"Pan right to {new_pan:.1f}°"
-        
+
         elif key in ['w', 'W', '\x1b[A']:  # Up
-            # Note: Assuming 'Up' visually decreases tilt angle relative to horizontal
-            # But in your 90-180 scheme, 'Up' might mean moving towards 90
-            new_tilt = max(90, current_tilt - self.increment)
+            new_tilt = max(self.camera.tilt.min_limit, current_tilt - self.increment)
             self.camera.set_tilt(new_tilt)
             self.last_command = f"Tilt up to {new_tilt:.1f}°"
-        
+
         elif key in ['s', 'S', '\x1b[B']:  # Down
-            new_tilt = min(180, current_tilt + self.increment)
+            new_tilt = min(self.camera.tilt.max_limit, current_tilt + self.increment)
             self.camera.set_tilt(new_tilt)
             self.last_command = f"Tilt down to {new_tilt:.1f}°"
 
-    # ... [Include existing handlers for increment, speed] ...
     def handle_increment(self, key):
         """Handle increment adjustment"""
         if key == '+' or key == '=':
-            self.increment = min(45.0, self.increment + 1.0)
+            self.increment = min(180.0, self.increment + 1.0)
             self.last_command = f"Increment increased to {self.increment:.1f}°"
         elif key == '-' or key == '_':
-            self.increment = max(1.0, self.increment - 1.0)
+            self.increment = max(0.25, self.increment - 1.0)
             self.last_command = f"Increment decreased to {self.increment:.1f}°"
-    
+
     def handle_speed(self, key):
         """Handle speed adjustment"""
         if key == ']':
-            self.transition_speed = min(10.0, self.transition_speed + 0.5)
+            self.transition_speed = min(30.0, self.transition_speed + 0.05)
             self.camera.pan.transition_speed = self.transition_speed
             self.camera.tilt.transition_speed = self.transition_speed
             self.last_command = f"Speed increased to {self.transition_speed:.1f}°/step"
         elif key == '[':
-            self.transition_speed = max(0.5, self.transition_speed - 0.5)
+            self.transition_speed = max(0.05, self.transition_speed - 0.05)
             self.camera.pan.transition_speed = self.transition_speed
             self.camera.tilt.transition_speed = self.transition_speed
             self.last_command = f"Speed decreased to {self.transition_speed:.1f}°/step"
@@ -195,9 +180,9 @@ class CameraController:
             marker = "→" if ttype == self.transition_type else " "
             print(f"  {marker} {i}. {ttype}")
         print()
-        
+
         choice = self._get_input("Enter number (or press Enter to cancel): ")
-        
+
         if choice and choice.isdigit():
             idx = int(choice) - 1
             if 0 <= idx < len(self.transition_types):
@@ -218,16 +203,16 @@ class CameraController:
         print("=" * 70)
         print(f"Current Limits: {self.camera.tilt.min_limit:.1f}° to {self.camera.tilt.max_limit:.1f}°")
         print()
-        
+
         min_in = self._get_input("Enter new MIN tilt angle (e.g. 90): ")
         if min_in is None: return
         max_in = self._get_input("Enter new MAX tilt angle (e.g. 180): ")
         if max_in is None: return
-        
+
         try:
             new_min = float(min_in)
             new_max = float(max_in)
-            
+
             if new_min < new_max:
                 self.camera.set_limits(tilt_limits=(new_min, new_max))
                 self.last_command = f"Tilt limits updated: {new_min}-{new_max}"
@@ -243,22 +228,24 @@ class CameraController:
         print("  GO TO POSITION")
         print("=" * 70)
         print()
-        
-        pan_input = self._get_input("Enter Pan angle (0-180): ")
+
+        pan_input = self._get_input(
+            f"Enter Pan angle ({self.camera.pan.min_limit:.0f}-{self.camera.pan.max_limit:.0f}): "
+        )
         if pan_input is None:
             self.last_command = "Go to cancelled"
             return
-        
-        tilt_input = self._get_input("Enter Tilt angle: ")
+
+        tilt_input = self._get_input(
+            f"Enter Tilt angle ({self.camera.tilt.min_limit:.0f}-{self.camera.tilt.max_limit:.0f}): "
+        )
         if tilt_input is None:
             self.last_command = "Go to cancelled"
             return
-        
+
         try:
             pan = float(pan_input)
             tilt = float(tilt_input)
-            
-            # Servo class handles clamping, just send it
             self.camera.set_position(pan, tilt)
             self.last_command = f"Moving to Pan={pan:.1f}°, Tilt={tilt:.1f}°"
         except ValueError:
@@ -277,9 +264,9 @@ class CameraController:
         for key, (pan, tilt) in self.saved_positions.items():
             print(f"  {key}: Pan={pan:.1f}°, Tilt={tilt:.1f}°")
         print()
-        
+
         slot = self._get_input("Save to slot (1-5): ")
-        
+
         if slot in ['1', '2', '3', '4', '5']:
             self.saved_positions[slot] = (
                 self.camera.pan.target_angle,
@@ -312,79 +299,86 @@ class CameraController:
         print("  D / →        - Pan right")
         print()
         print("SETTINGS:")
+        print("  +/-          - Increase/decrease step increment")
+        print("  [/]          - Decrease/increase transition speed")
+        print("  T            - Change transition type")
+        print("  G            - Go to specific angles")
+        print("  P            - Save current position to preset")
         print("  L            - Adjust Tilt Limits (Safety Stop)")
         print()
-        # ... [Truncated rest of help for brevity] ...
+        print("PRESETS:")
+        print("  1-5          - Load saved preset positions")
+        print("  C            - Center position (90°, 90°)")
+        print()
         print("  Q / ESC      - Quit program")
         print()
-        
+
         self._get_input("Press Enter to continue...")
         self.last_command = "Help displayed"
-    
+
     def run(self):
         """Main control loop"""
         self._refresh_display()
-        
+
         try:
             while self.running:
                 key = self._get_key()
-                
-                # Movement keys
-                if key in ['w', 'W', 'a', 'A', 's', 'S', 'd', 'D', 
-                          '\x1b[A', '\x1b[B', '\x1b[C', '\x1b[D']:
+
+                if key in ['w', 'W', 'a', 'A', 's', 'S', 'd', 'D',
+                           '\x1b[A', '\x1b[B', '\x1b[C', '\x1b[D']:
                     self.handle_wasd(key)
                     self._refresh_display()
-                
+
                 elif key in ['c', 'C']:
                     self.camera.center()
                     self.last_command = "Centered to 90°, 90°"
                     self._refresh_display()
-                
+
                 elif key in ['1', '2', '3', '4', '5']:
                     self.load_preset(key)
                     self._refresh_display()
-                
+
                 elif key in ['+', '=', '-', '_']:
                     self.handle_increment(key)
                     self._refresh_display()
-                
+
                 elif key in ['[', ']', '{', '}']:
                     self.handle_speed(key)
                     self._refresh_display()
-                
+
                 elif key in ['t', 'T']:
                     self.change_transition_type()
                     self._refresh_display()
-                
+
                 elif key in ['g', 'G']:
                     self.goto_position()
                     self._refresh_display()
-                
+
                 elif key in ['p', 'P']:
                     self.save_position()
                     self._refresh_display()
-                
+
                 elif key in ['l', 'L']:
                     self.set_tilt_limits()
                     self._refresh_display()
-                
+
                 elif key in ['h', 'H']:
                     self.show_help()
                     self._refresh_display()
-                
+
                 elif key in ['q', 'Q', '\x1b']:
                     self.last_command = "Shutting down..."
                     self._refresh_display()
                     self.running = False
                     break
-                
+
                 time.sleep(0.01)
-        
+
         except KeyboardInterrupt:
             pass
         finally:
             self._cleanup()
-    
+
     def _cleanup(self):
         """Clean shutdown"""
         print("\n\nShutting down camera controller...")
@@ -401,15 +395,15 @@ def main():
     print()
     print("Initializing hardware...")
     print()
-    
-    PAN_PIN = 33   
-    TILT_PIN = 32  
-    
+
+    PAN_PIN = 33
+    TILT_PIN = 32
+
     print(f"Pan Pin:  {PAN_PIN}")
     print(f"Tilt Pin: {TILT_PIN}")
-    print("Note: Tilt is clamped to 90-180 degrees by default.")
+    print("Note: Tilt is clamped to 0-135 degrees by default.")
     print()
-    
+
     try:
         controller = CameraController(pan_pin=PAN_PIN, tilt_pin=TILT_PIN)
         print("✓ Hardware initialized successfully!")
@@ -417,9 +411,9 @@ def main():
         print("Starting controller in 2 seconds...")
         print("(Press 'H' at any time for help)")
         time.sleep(2)
-        
+
         controller.run()
-    
+
     except Exception as e:
         print(f"\n❌ Error: {e}")
         sys.exit(1)

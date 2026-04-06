@@ -14,7 +14,7 @@
 // -------------------------
 
 const ADC_CHANNELS = 8;
-const WINDOW_SEC = 30.0;
+const WINDOW_SEC = 300.0;
 const DRAW_HZ = 10.0;
 
 let runT0 = null;
@@ -114,11 +114,14 @@ const COLORS = [
   "#999999", // gray
 ];
 
+const names = ["0-0 CH4 ","0-1 CO","0-2 VOCs","0-3 NIR Flame","1-0 NO2","1-1 NH3","1-2 CO","1-3 None"];
+
+
 function makeDatasets() {
   const ds = [];
   for (let i = 0; i < ADC_CHANNELS; i++) {
     ds.push({
-      label: `ADC${i < 4 ? 0 : 1} CH${i % 4}`,
+      label: names[i],
       data: [],
       borderColor: COLORS[i],
       backgroundColor: COLORS[i],
@@ -458,7 +461,8 @@ startSSE();
 //
 /////////////////////////////////
 
-const names = ["ADC0 CH0","ADC0 CH1","ADC0 CH2","ADC0 CH3","ADC1 CH0","ADC1 CH1","ADC1 CH2","ADC1 CH3"];
+// Defined above
+//const names = ["0-0 CH4 ","0-1 CO","0-2 VOCs","0-3 NIR Flame","1-0 NO2","1-1 NH3","1-2 CO","1-3 None"];
 
 function renderADC(vals) {
   const tbody = document.getElementById("adc");

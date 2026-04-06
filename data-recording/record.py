@@ -704,9 +704,9 @@ def parse_args():
     p.add_argument("--gstreamer", action="store_true", help="Use GStreamer pipelines for camera capture (cv2.CAP_GSTREAMER)")
     p.add_argument("--gst-tee", action="store_true", help="Use tee for GStreamer for separate mp4 writing and frame processing")
     p.add_argument("-v", "--verbose", action="store_true", help="Print out detailed logging. (For web preview)")
-    p.add_argument("--ir-norm", type=str, default="minmax", help="Set the normalization method for IR camera frames. (minmax or fixed)")
-    p.add_argument("--ir-max", type=float, default="80.0", help="Set the maximum temperature for the IR camera in fixed normalization mode")
-    p.add_argument("--ir-min", type=float, default="10.0", help="Set the minimum temperature for the IR camera in fixed normalization mode")
+    p.add_argument("--ir-norm", type=str, default="fixed", help="Set the normalization method for IR camera frames. (minmax or fixed)")
+    p.add_argument("--ir-max", type=float, default="150.0", help="Set the maximum temperature for the IR camera in fixed normalization mode")
+    p.add_argument("--ir-min", type=float, default="20.0", help="Set the minimum temperature for the IR camera in fixed normalization mode")
 
     return p.parse_args()
 
