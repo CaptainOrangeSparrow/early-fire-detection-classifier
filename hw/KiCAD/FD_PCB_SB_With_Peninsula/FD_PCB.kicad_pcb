@@ -41066,6 +41066,39 @@
 	(dimension
 		(type aligned)
 		(layer "Cmts.User")
+		(uuid "a1fe7a0e-7f38-424c-ac1a-282d4712a40d")
+		(pts
+			(xy 123 98.3) (xy 135.5 98.3)
+		)
+		(height 11.428)
+		(gr_text "12.5000 mm"
+			(at 129.25 108.578 0)
+			(layer "Cmts.User")
+			(uuid "a1fe7a0e-7f38-424c-ac1a-282d4712a40d")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(format
+			(prefix "")
+			(suffix "")
+			(units 3)
+			(units_format 1)
+			(precision 4)
+		)
+		(style
+			(thickness 0.1)
+			(arrow_length 1.27)
+			(text_position_mode 0)
+			(extension_height 0.58642)
+			(extension_offset 0.5) keep_text_aligned)
+	)
+	(dimension
+		(type aligned)
+		(layer "Cmts.User")
 		(uuid "a8956cd7-a218-446c-ade8-2678a696ad95")
 		(pts
 			(xy 92.675573 109.888) (xy 88.675573 109.888)
