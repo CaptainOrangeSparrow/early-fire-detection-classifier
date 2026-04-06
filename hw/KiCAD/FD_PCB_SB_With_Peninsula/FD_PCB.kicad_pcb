@@ -4595,7 +4595,7 @@
 		(uuid "1f2119f1-3ba2-4f80-9543-2eb2a9164b92")
 		(at 191.262 96.012)
 		(property "Reference" "G***"
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "2b3354bc-4778-4b73-9338-d9ed4c4280c6")
@@ -4607,7 +4607,7 @@
 			)
 		)
 		(property "Value" "LOGO"
-			(at 0.75 0 360)
+			(at 0.75 0 0)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "3e5c02d7-a590-4277-b92d-5ef89e724de7")
@@ -4619,7 +4619,7 @@
 			)
 		)
 		(property "Footprint" "Images:BubblesIcon8"
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "82c3f18e-c5a9-430f-9312-474218241395")
@@ -4631,7 +4631,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "6c0deb86-6eb4-4312-ab60-41e51436b8cb")
@@ -4643,7 +4643,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "996670f8-c4b0-4944-8968-5a96b1dbb32e")
@@ -9348,7 +9348,7 @@
 		(uuid "4446243b-f3ec-4071-94f7-12d2faea4cd2")
 		(at 165.354 66.548)
 		(property "Reference" "G***"
-			(at -3.81 -1.524 360)
+			(at -3.81 -1.524 0)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "a9e94ff4-2a5a-4aeb-aaad-1cea98c03987")
@@ -9360,7 +9360,7 @@
 			)
 		)
 		(property "Value" "LOGO"
-			(at 0.75 0 360)
+			(at 0.75 0 0)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "494efade-a95b-4122-a4c6-966aacecbf31")
@@ -9372,7 +9372,7 @@
 			)
 		)
 		(property "Footprint" "Images:FireIcon"
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "9561a670-2f2b-4a56-b5fe-9f91e336babf")
@@ -9384,7 +9384,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "68da8ffd-06d3-47ac-aaca-bcdbfa66eb76")
@@ -9396,7 +9396,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "b5fb8ff9-1a07-408b-b370-361a34ae93f6")
@@ -21614,7 +21614,7 @@
 		(uuid "8c8ddf68-41e9-4367-861b-1f1ddbe5139a")
 		(at 227.838 54.864 180)
 		(property "Reference" "G***"
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "b33be2a8-e206-4ef8-8356-4271385c2f95")
@@ -21626,7 +21626,7 @@
 			)
 		)
 		(property "Value" "LOGO"
-			(at 0.75 0 360)
+			(at 0.75 0 0)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "b57994ef-50c7-484a-ade6-ad43475d8fb9")
@@ -21638,7 +21638,7 @@
 			)
 		)
 		(property "Footprint" "Images:BubblesIcon"
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "36653d6d-d0a0-4ea4-a858-eccda735160f")
@@ -21650,7 +21650,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "94d035dc-e56d-436b-bb8d-ca314bfd8a0c")
@@ -21662,7 +21662,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "d3119ed7-580d-4731-b62d-68ced2a6faa6")
@@ -25845,7 +25845,7 @@
 		(descr "Capacitor SMD 0805 (2012 Metric), square (rectangular) end terminal, IPC_7351 nominal, (Body size source: IPC-SM-782 page 76, https://www.pcb-3d.com/wordpress/wp-content/uploads/ipc-sm-782a_amendment_1_and_2.pdf, https://docs.google.com/spreadsheets/d/1BsfQQcO9C6DZCsRaXUlFlo91Tg2WpOkGARC1WS5S8t0/edit?usp=sharing), generated with kicad-footprint-generator")
 		(tags "capacitor")
 		(property "Reference" "C19"
-			(at -2.54 0.1016 90)
+			(at 0.1016 1.5132 180)
 			(layer "F.SilkS")
 			(uuid "eb1b8d43-8f5c-47b7-ab6b-e8ad7e51b76d")
 			(effects
@@ -36580,7 +36580,7 @@
 		(uuid "dc3630df-b504-48e9-bb73-69038096deee")
 		(at 165.862 44.958 180)
 		(property "Reference" "G***"
-			(at -3.81 -1.524 360)
+			(at -3.81 -1.524 0)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "e4b7ea26-bd6a-4713-aef5-5e7262011fb5")
@@ -36592,7 +36592,7 @@
 			)
 		)
 		(property "Value" "LOGO"
-			(at 0.75 0 360)
+			(at 0.75 0 0)
 			(layer "F.SilkS")
 			(hide yes)
 			(uuid "88da84fa-e931-450c-a904-5a329b71aed7")
@@ -36604,7 +36604,7 @@
 			)
 		)
 		(property "Footprint" "Images:FireIcon"
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "229675d0-9507-41ff-9c56-6c992e1040a9")
@@ -36616,7 +36616,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "998c0e54-4b96-437d-8322-b75ced6d3efa")
@@ -36628,7 +36628,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 0 0 360)
+			(at 0 0 0)
 			(layer "F.Fab")
 			(hide yes)
 			(uuid "0ecbb48e-097b-46ee-af55-4a986adc4afe")
@@ -37900,7 +37900,7 @@
 		(descr "Through hole straight pin header, 1x02, 2.54mm pitch, single row")
 		(tags "Through hole pin header THT 1x02 2.54mm single row")
 		(property "Reference" "J10"
-			(at -0.0124 4.876 90)
+			(at -2.2968 2.418 180)
 			(layer "F.SilkS")
 			(uuid "bdcdfc91-2ef9-4032-9795-7b32060d6daf")
 			(effects
@@ -42877,6 +42877,18 @@
 		(layer "F.SilkS")
 		(uuid "ad033c68-26c5-4b13-b616-9b9f94ec1e7f")
 	)
+	(gr_poly
+		(pts
+			(xy 123.438 87.8132) (xy 124.0028 87.8132) (xy 123.4748 88.392) (xy 123.444 88.392) (xy 123.438 88.386)
+		)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(fill solid)
+		(layer "F.SilkS")
+		(uuid "b6f06f1c-a61d-466a-bc9e-779b51d7350d")
+	)
 	(gr_line
 		(start 33.437806 156.840233)
 		(end 33.437806 115.840233)
@@ -45440,6 +45452,18 @@
 			(justify left bottom)
 		)
 	)
+	(gr_text "SERVOS"
+		(at 119.126 92.202 0)
+		(layer "F.SilkS")
+		(uuid "6683b9fa-6389-4964-9a98-5f0b48d813bb")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.1)
+			)
+			(justify left bottom)
+		)
+	)
 	(gr_text "CS1"
 		(at 111.252 50.546 0)
 		(layer "F.SilkS")
@@ -45488,8 +45512,8 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "PITCH SERVO"
-		(at 113.964 92.4576 0)
+	(gr_text "YAW"
+		(at 115.698 92.4632 0)
 		(layer "F.SilkS" knockout)
 		(uuid "7a06ad78-3ae0-43cf-9ad2-06ff78de823b")
 		(effects
@@ -45548,8 +45572,8 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "YAW SERVO"
-		(at 123.362 87.3776 90)
+	(gr_text "PITCH"
+		(at 119.7864 87.7824 0)
 		(layer "F.SilkS" knockout)
 		(uuid "8bc9e172-035d-493b-9882-5a6df921eb98")
 		(effects
@@ -46053,7 +46077,7 @@
 		)
 	)
 	(gr_text "SEN0219 CONN"
-		(at 137.3124 99.8728 90)
+		(at 133.35 99.822 90)
 		(layer "F.SilkS" knockout)
 		(uuid "f0d9817a-358d-4039-a9bf-a75c1af33d30")
 		(effects
