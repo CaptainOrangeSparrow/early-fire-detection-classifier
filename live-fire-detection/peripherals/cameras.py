@@ -381,10 +381,10 @@ class IRCamera(Camera):
         raw_avg = float(self._raw_thermal_frame.mean())
         raw_center = int(self._raw_thermal_frame[96, 128])
 
-        mintemp = raw_min / 64.0 - 273.15
-        maxtemp = raw_max / 64.0 - 273.15
-        avgtemp = raw_avg / 64.0 - 273.15
-        temp_center = raw_center / 64.0 - 273.15
+        mintemp = raw_min
+        maxtemp = raw_max
+        avgtemp = raw_avg
+        temp_center = raw_center
 
         self._min_temp = mintemp
         self._max_temp = maxtemp

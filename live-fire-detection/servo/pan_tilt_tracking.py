@@ -44,8 +44,8 @@ Tuning order:
 """
 
 # PID gains
-PAN_KP,  PAN_KI,  PAN_KD  = 0.2, 0.0, 0.0
-TILT_KP, TILT_KI, TILT_KD = 0.15, 0.0, 0.0
+PAN_KP,  PAN_KI,  PAN_KD  = 0.2, 0.02, 0.02
+TILT_KP, TILT_KI, TILT_KD = 0.15, 0.015, 0.015
 
 # Error sign convention for positve angular error corrections
 PAN_ERROR_SIGN  = -1 # positive because pixel x increases to the right, and positive pan correction should move the camera right

@@ -54,7 +54,7 @@ class FireDistinguisher:
         self.run_dir = "/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/" + constants.RECORDINGS_PARENT_DIR
         self.cmap = IRCamera.ColorMap[constants.IR_COLORMAP]
         generate_colorbar_png(os.path.join("utilities/static", "colorbar.png"), IRCamera.COLORMAPS_LIST[self.cmap.value], num_ticks=3)
-        self.ir_norm_settings = ("MINMAX", 80, 10)
+        self.ir_norm_settings = ("FIXED", 150, 20) # ("MINMAX", 80, 10) (mode, max, min)
 
         # Sensor Hardware
         sensor_config = {

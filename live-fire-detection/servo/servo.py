@@ -206,7 +206,6 @@ class Servo:
             step = effective_step * direction
             step = step / reduction_factor
             step = math.copysign(max(abs(step), 0.5), direction)
-            print(f"Effective Step: {effective_step}, Actual Step: {step}")
             return end_angle if abs(step) > error else start_angle + step
 
         elif transition_type == 'ease-out-quad':

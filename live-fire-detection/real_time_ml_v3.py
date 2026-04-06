@@ -30,7 +30,7 @@ def process_fused_detection(frame_v,
     """
     # inference
     res_v = models["vis_model"](frame_v, verbose=False, conf=0.497)[0]
-    res_i = models["ir_model"](frame_i, verbose=False, conf=0.557)[0]
+    res_i = models["ir_model"](frame_i, verbose=False, conf=0.418)[0]
 
     def extract_boxes(results):
         if results.boxes is None or len(results.boxes) == 0:
@@ -76,10 +76,11 @@ def process_fused_detection(frame_v,
 
         # Check if the ROI contains any pixels >= threshold
         if temp_roi.size > 0 and np.max(temp_roi) >= temperature_threshold:
-            print(f"{np.max(temp_roi)} >= temperature_threshold")
+            print(f"{np.max(temp_roi)} >= {temperature_threshold} temperature threshold")
             pass # Keep detection
         else:
             # Suppress detection: Thermal evidence does not support YOLO prediction
+            print("Detection Supressed")
             ir_f_conf = 0.0
             ir_f_box = None
             raw_i = {"boxes": [], "confidences": [], "classes": []} # Default to empty for consistency

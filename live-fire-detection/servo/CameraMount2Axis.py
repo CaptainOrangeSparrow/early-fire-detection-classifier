@@ -1,7 +1,7 @@
 import threading
 import time
 import Jetson.GPIO as GPIO
-import servo
+import servo.servo as servo
 
 
 class CameraMount2Axis:
