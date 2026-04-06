@@ -1,0 +1,7 @@
+﻿Designator,Footprint,Quantity,Value,LCSC Part #
+D1,LED_D5.0mm,1,+5V PWR,
+D2,LED_D5.0mm,1,+3V3 PWR,
+D3,LED_D5.0mm,1,LED_1,
+D4,LED_D5.0mm,1,LED_2,
+"H1, H2",MountingHole_4_40,2,~,
+J21,PinHeader_1x08_P2.54mm_Vertical,1,Conn_01x08,
