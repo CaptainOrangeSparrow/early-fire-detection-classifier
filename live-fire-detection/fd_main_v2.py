@@ -132,7 +132,7 @@ class FireDistinguisher:
         ml_results = ml.process_fused_detection(
             snapshot.reg.frame,
             snapshot.ir.frame,
-            snapshot.ir.temp_frame, 
+            snapshot.ir.temp_frame / 64.0 - 273.15, # Convert from fixed point Kelvin to floating point Celcius 
             self.models,
             returnAnnotatedImg=False
         )

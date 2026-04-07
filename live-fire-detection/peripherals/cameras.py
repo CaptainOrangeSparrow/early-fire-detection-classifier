@@ -374,16 +374,17 @@ class IRCamera(Camera):
         avgtemp = round(avgtemp,2)
         '''
         raw_thermal_frame_fixed_point_kelvin = (thdata[...,1].astype(np.uint16) << 8) | thdata[...,0]
-        self._raw_thermal_frame = (raw_thermal_frame_fixed_point_kelvin / 64.0) - 273.15
+        #self._raw_thermal_frame = (raw_thermal_frame_fixed_point_kelvin / 64.0) - 273.15
+        self._raw_thermal_Frame = raw_thermal_Frame_fixed_point_kelvin
 
         raw_min = int(self._raw_thermal_frame.min())
         raw_max = int(self._raw_thermal_frame.max())
         raw_avg = float(self._raw_thermal_frame.mean())
         raw_center = int(self._raw_thermal_frame[96, 128])
 
-        mintemp = raw_min
-        maxtemp = raw_max
-        avgtemp = raw_avg
+        mintemp = raw_min / 64.0 - 273.15
+        maxtemp = raw_max / 64.0 - 273.15
+        avgtemp = raw_avg / 64.0 - 273.15
         temp_center = raw_center
 
         self._min_temp = mintemp
