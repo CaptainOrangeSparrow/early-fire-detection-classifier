@@ -99,7 +99,7 @@ class FireDistinguisher:
         # Machine Learning
         self.vis_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/visible_yolov11n/best_rgb.engine'
         self.ir_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/infrared_yolov11n/best_ir.engine'
-        self.meta_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/meta-learner/fire_meta_learner.pkl'
+        self.meta_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/meta-learner/fire_meta_learner_v2.pkl'
         self.models = ml.initialize_fire_models(vis_path=self.vis_path, ir_path=self.ir_path, meta_path=self.meta_path)
 
         # Audio
