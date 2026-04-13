@@ -103,7 +103,7 @@ class FireDistinguisher:
         # Machine Learning
         self.vis_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/visible_yolov11n/best_rgb.engine'
         self.ir_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/infrared_yolov11n/best_ir.engine'
-        self.meta_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/meta-learner/fire_meta_learner.pkl'
+        self.meta_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/meta-learner/fire_meta_learner_v2.pkl'
         self.models = ml.initialize_fire_models(vis_path=self.vis_path, ir_path=self.ir_path, meta_path=self.meta_path)
 
         # Audio
@@ -122,11 +122,11 @@ class FireDistinguisher:
             vfov_deg=VFOV_DEG,
             pan_kp=PAN_KP,   pan_ki=PAN_KI,   pan_kd=PAN_KD,
             tilt_kp=TILT_KP, tilt_ki=TILT_KI, tilt_kd=TILT_KD,
-            scan_speed=1.5,         # slow enough for unblurred frames during sweep
-            track_speed=5.0,        # responsive for tight PID control
+            scan_speed=1.5,
+            track_speed=5.0,
             pan_sweep_time=4.0,
-            track_loss_timeout=0.5,
-            scan_resume_delay=3.0,
+            track_loss_timeout=3.0,     # Time to wait after losing target before declaring "lost" and resuming scan
+            scan_resume_delay=3.0,      # Time to wait after losing target before resuming scan   
             fire_coverage_min=0.0,
             fire_coverage_max=0.2,
             pan_error_sign=PAN_ERROR_SIGN,

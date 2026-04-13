@@ -278,7 +278,7 @@ class FireTracker:
             transition_speed=track_speed,
             pan_limits=pan_limits,
             tilt_limits=tilt_limits,
-            update_rate_hz=300.0,    # Attempt to increase to 100, 200, 300 Hz and verify stability of the PID loop at each step
+            update_rate_hz=50.0,    # Attempt to increase to 100, 200, 300 Hz and verify stability of the PID loop at each step
         )
         self._scan_speed     = scan_speed
         self._track_speed    = track_speed
@@ -360,8 +360,10 @@ class FireTracker:
         )
 
         if fire_detected:
+            print("Valid fire detection this tick!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             self._handle_detection(obj_x, obj_y, cx, cy, ml_results)
         else:
+            print("No valid fire detection this tick.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             self._handle_no_detection()
 
         # Return the current state for telemetry/debugging purposes
@@ -433,7 +435,7 @@ class FireTracker:
         ml_results: dict,
     ) -> None:
         # Process a tick where a valid fire centroid was detected
-
+        print("**********************************************\n**********************************************\n**********************************************")
         # State Entry Handling
         with self._state_lock:
             prev = self._state
@@ -507,7 +509,7 @@ class FireTracker:
             # position silently; no PID update is applied this tick.
             self._cancel_timers()
             
-            # Update state before starting the timer
+            # Update state befthe timer
             self._state = TrackerState.HOLDING
             
             # Start the hold timer to handle detection losses.  

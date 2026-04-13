@@ -1,7 +1,7 @@
 import threading
 import time
 import Jetson.GPIO as GPIO
-import servo.servo as servo
+import servo.servo as servo # servo.servo as servo for fd_main
 
 
 class CameraMount2Axis:
@@ -51,7 +51,8 @@ class CameraMount2Axis:
             transition_type=transition_type,
             transition_speed=transition_speed,
             min_limit=pan_limits[0],
-            max_limit=pan_limits[1]
+            max_limit=pan_limits[1],
+            frequency=update_rate_hz
         )
 
         self.tilt = servo.Servo(
@@ -61,7 +62,8 @@ class CameraMount2Axis:
             transition_type=transition_type,
             transition_speed=transition_speed,
             min_limit=tilt_limits[0],
-            max_limit=tilt_limits[1]
+            max_limit=tilt_limits[1],
+            frequency=update_rate_hz
         )
 
         # Shared target state

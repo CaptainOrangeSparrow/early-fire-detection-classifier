@@ -18,7 +18,8 @@ class CameraController:
             transition_type='linear',
             transition_speed=2.0,
             pan_limits=(0.0, 180.0),
-            tilt_limits=(0.0, 135)
+            tilt_limits=(0.0, 135),
+            update_rate_hz=50.0
         )
 
         self.increment = 5.0
