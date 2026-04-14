@@ -16,6 +16,9 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum, auto
 from typing import Callable, Optional
+import csv
+import time
+from datetime import datetime
 
 from .CameraMount2Axis import CameraMount2Axis
 
@@ -66,12 +69,16 @@ class PID:
         self._prev_errors = deque([0.0, 0.0], maxlen=2)
         self._prev_output = 0.0
 
-    def update(self, error: float) -> float:
+    def update(self, error: float, px_error: float) -> float:
         """
         Compute the control output for the given angular error.
         
         error: angular tracking error in degrees.
         """
+
+        if abs(px_error) < 50:  # Deadband threshold in pixels to prevent jitter when the target is close enough to center
+            return 0.0
+
         delta = (
             self._k1 * error
             + self._k2 * self._prev_errors[0]
@@ -260,11 +267,13 @@ class FireTracker:
         # Axis sign conventions
         pan_error_sign:  int = -1,
         tilt_error_sign: int = +1,
-        
+
         # Callbacks
         on_fire_acquired: Optional[Callable[[], None]]                            = None,
         on_fire_lost:     Optional[Callable[[], None]]                            = None,
         on_fire_tracking: Optional[Callable[[float, float, float, float], None]]  = None,
+        
+
         
         # Debug
         debug: bool = False,
@@ -327,6 +336,12 @@ class FireTracker:
             thread_name_prefix="tracker_cb",
         )
 
+        # PID
+        
+        # Graphing PID Errors for debugging and tuning purposes.  Writes to a new CSV file each time the tracker enters TRACKING state from SCANNING state.  Columns: [dy_px, dx_px, timestamp]
+        now = datetime.now()
+        self.filelocation = f"/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/servo/pid_recording_sessions/pid_session_{now:%Y-%m-%d_%H-%M-%S}.csv"
+
         # ── FSM ───────────────────────────────────────────────────────────
         self._state      = TrackerState.SCANNING
         self._state_lock = threading.Lock()
@@ -360,10 +375,8 @@ class FireTracker:
         )
 
         if fire_detected:
-            print("Valid fire detection this tick!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             self._handle_detection(obj_x, obj_y, cx, cy, ml_results)
         else:
-            print("No valid fire detection this tick.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             self._handle_no_detection()
 
         # Return the current state for telemetry/debugging purposes
@@ -424,6 +437,11 @@ class FireTracker:
         self._mount.stop_scan()
         self._mount.shutdown(center=center)
 
+    @staticmethod
+    def _write_control_graph(filename, dy_px, dx_px) -> None: 
+        with open(filename, 'a') as outfile:
+            writer = csv.writer(outfile)
+            writer.writerow([dy_px,  dx_px, time.perf_counter()])
 
     # FSM handlers  (called from tick thread or timer threads) ─────────────────────────────────────────────────────────────────────────
     def _handle_detection(
@@ -453,6 +471,12 @@ class FireTracker:
                     self._cb_executor.submit(self._on_fire_acquired_cb)
                 self._log_banner("*", "Fire detected – stopping scan, entering tracking.")
 
+                # Prepare File location for store of PID pixel errors (Called Once on transition to tracking state from scanning state)
+                if self._debug:
+                    now = datetime.now()
+                    self.filelocation = f"/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/servo/pid_recording_sessions/pid_session_{now:%Y-%m-%d_%H-%M-%S}.csv"
+
+
             elif prev in (TrackerState.HOLDING, TrackerState.LOST):
                 #  Re-acquisition from HOLDING or LOST states:
                 # Cancel the hold or resume timer and return to TRACKING.
@@ -472,11 +496,15 @@ class FireTracker:
         dx_px = obj_x - cx
         dy_px = obj_y - cy
 
+        # Write to preexisting csv or create csv to hold pixel errors
+        if self._debug: 
+            self._write_control_graph(filename=self.filelocation, dx_px=dx_px, dy_px=dy_px)
+
         error_pan  = self._pan_error_sign  * self._pixel_to_angle(dx_px, self._half_hfov_rad, self._frame_w)
         error_tilt = self._tilt_error_sign * self._pixel_to_angle(dy_px, self._half_vfov_rad, self._frame_h)
 
-        pan_update  = self._pid_pan.update(error_pan)
-        tilt_update = self._pid_tilt.update(error_tilt)
+        pan_update  = self._pid_pan.update(error_pan, dx_px)
+        tilt_update = self._pid_tilt.update(error_tilt, dy_px)
 
         new_pan  = self._mount.get_pan()  + pan_update
         new_tilt = self._mount.get_tilt() + tilt_update
@@ -489,6 +517,7 @@ class FireTracker:
                 f"[tracker] TRACKING | "
                 f"obj=({obj_x},{obj_y}) conf={conf:.2f} | "
                 f"err=({error_pan:+.2f}°, {error_tilt:+.2f}°) | "
+                f"px_err=({dx_px:+.1f}px, {dy_px:+.1f}px) | "
                 f"pid=({pan_update:+.2f}°, {tilt_update:+.2f}°) | "
                 f"mount=({new_pan:.1f}°, {new_tilt:.1f}°)"
             )
@@ -602,6 +631,26 @@ class FireTracker:
                 2.0 * pixel_offset * math.tan(half_fov_rad),
                 frame_dim,
             )
+        )
+        
+    @staticmethod
+    def _angle_to_pixel(
+        angle_deg:    float,
+        half_fov_rad: float,
+        frame_dim:    int,
+    ) -> float:
+        """
+        Convert an angular displacement to a signed pixel offset from the
+        frame centre — the exact inverse of _pixel_to_angle:
+            x = b · tan(φ) / ( 2 · tan(θ) )
+        angle_deg    : Angular displacement φ in degrees.
+        half_fov_rad : Half-FOV for the axis in radians.
+        frame_dim    : Total frame dimension in pixels for the axis.
+        Returns      : Signed pixel distance from frame centre.
+        """
+        return (
+            frame_dim * math.tan(math.radians(angle_deg))
+            / (2.0 * math.tan(half_fov_rad))
         )
 
     def _log(self, msg: str) -> None:
