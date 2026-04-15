@@ -42,7 +42,7 @@ from utilities.key_handler import TerminalKeyWatcher, poll_quit_key
 from utilities.single_instance import SingleInstance
 from utilities.web_preview import generate_colorbar_png
 from telemetry.telemetry_wrapper import TelemetryWrapper
-from servo.fire_tracker_backup import FireTracker, TrackerState
+from servo.fire_tracker import FireTracker, TrackerState
 from servo.pan_tilt_tracking import (          # constants only — no factory fns
     PAN_PIN,  TILT_PIN,
     PAN_LIMITS, TILT_LIMITS,
@@ -134,6 +134,9 @@ class FireDistinguisher:
             on_fire_acquired=self._cb_fire_acquired,
             on_fire_lost=self._cb_fire_lost,
             debug=True,
+            sysid_mode=True,
+            sysid_duration_s=90.0,
+            sysid_freq_hz=3.0, 
         )
 
     def _cb_fire_acquired(self) -> None:

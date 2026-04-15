@@ -19,7 +19,6 @@ from typing import Callable, Optional
 import csv
 import time
 from datetime import datetime
-import random
 
 from .CameraMount2Axis import CameraMount2Axis
 
@@ -278,10 +277,6 @@ class FireTracker:
         
         # Debug
         debug: bool = False,
-        
-        sysid_mode: bool = False,
-        sysid_duration_s: float = 90.0,
-        sysid_freq_hz: float = 3.0 
     ) -> None:
 
         # ── Mount ─────────────────────────────────────────────────────────
@@ -358,37 +353,10 @@ class FireTracker:
 
         # ── Debug ─────────────────────────────────────────────────────────
         self._debug = debug
-        
-        # ── Axis limits (stored for sysid amplitude clamping) ────────────
-        self._pan_limits  = pan_limits
-        self._tilt_limits = tilt_limits
-
-        # ── Sysid mode ────────────────────────────────────────────────────
-        self._sysid_mode     = sysid_mode
-        self._sysid_duration_s = sysid_duration_s
-        self._sysid_freq_hz  = sysid_freq_hz
-        self._sysid_active   = False
-        self._sysid_done     = False
-        self._sysid_seq_pan: list[float]  = []
-        self._sysid_seq_tilt: list[float] = []
-        self._sysid_index    = 0
-        self._sysid_base_pan  = 0.0
-        self._sysid_base_tilt = 0.0
-        self._sysid_start_t   = 0.0
-        self._sysid_last_switch_t = 0.0
-        if sysid_mode:
-            self._mount.set_position(90.0, 90.0)  # Start centered
-            now = datetime.now()
-            self._sysid_filepath = (
-                f"/home/firedistinguisher/projects/early-fire-detection-classifier/"
-                f"live-fire-detection/servo/sysid_sessions/"
-                f"sysid_{now:%Y-%m-%d_%H-%M-%S}.csv"
-            ) 
 
         # ── Start scanning immediately ────────────────────────────────────
-        if not sysid_mode:
-            self._mount.set_speeds(speed=scan_speed)
-            self._mount.start_scan(pan_sweep_time=pan_sweep_time, speed=scan_speed)
+        self._mount.set_speeds(speed=scan_speed)
+        self._mount.start_scan(pan_sweep_time=pan_sweep_time, speed=scan_speed)
 
     # Public API ─────────────────────────────────────────────────────────────────────────
     def update(self, ml_results: dict) -> TrackerState:
@@ -405,13 +373,6 @@ class FireTracker:
             coverage_min=self._coverage_min,
             coverage_max=self._coverage_max,
         )
-
-        if self._sysid_mode:
-            if fire_detected and not self._sysid_done:
-                self._handle_sysid_tick(obj_x, obj_y, cx, cy)
-            elif not fire_detected:
-                self._log("[sysid] No fire detected – sysid inactive.")
-            return self.get_state()  # Return early in sysid mode since we don't want to run the normal FSM logic
 
         if fire_detected:
             self._handle_detection(obj_x, obj_y, cx, cy, ml_results)
@@ -477,10 +438,10 @@ class FireTracker:
         self._mount.shutdown(center=center)
 
     @staticmethod
-    def _write_control_graph(filename, dy_ang, dx_ang, cmd_pan_ang, cmd_tilt_ang) -> None: 
+    def _write_control_graph(filename, dy_px, dx_px) -> None: 
         with open(filename, 'a') as outfile:
             writer = csv.writer(outfile)
-            writer.writerow([dy_ang,  dx_ang, cmd_pan_ang, cmd_tilt_ang, time.perf_counter()])
+            writer.writerow([dy_px,  dx_px, time.perf_counter()])
 
     # FSM handlers  (called from tick thread or timer threads) ─────────────────────────────────────────────────────────────────────────
     def _handle_detection(
@@ -535,27 +496,18 @@ class FireTracker:
         dx_px = obj_x - cx
         dy_px = obj_y - cy
 
+        # Write to preexisting csv or create csv to hold pixel errors
+        if self._debug: 
+            self._write_control_graph(filename=self.filelocation, dx_px=dx_px, dy_px=dy_px)
 
-        
-        angle_pan = self._pixel_to_angle(dx_px, self._half_hfov_rad, self._frame_w)
-        angle_tilt = self._pixel_to_angle(dy_px, self._half_vfov_rad, self._frame_h)
-
-
-        error_pan  = self._pan_error_sign  * angle_pan
-        error_tilt = self._tilt_error_sign * angle_tilt
+        error_pan  = self._pan_error_sign  * self._pixel_to_angle(dx_px, self._half_hfov_rad, self._frame_w)
+        error_tilt = self._tilt_error_sign * self._pixel_to_angle(dy_px, self._half_vfov_rad, self._frame_h)
 
         pan_update  = self._pid_pan.update(error_pan, dx_px)
         tilt_update = self._pid_tilt.update(error_tilt, dy_px)
-        
-        
 
         new_pan  = self._mount.get_pan()  + pan_update
         new_tilt = self._mount.get_tilt() + tilt_update
-
-        
-        # Write to preexisting csv or create csv to hold pixel errors
-        if self._debug: 
-            self._write_control_graph(filename=self.filelocation, dx_ang=angle_pan, dy_ang=angle_tilt, cmd_pan_ang=new_pan, cmd_tilt_ang=new_tilt)
 
         self._mount.set_position(new_pan, new_tilt)
 
@@ -700,103 +652,6 @@ class FireTracker:
             frame_dim * math.tan(math.radians(angle_deg))
             / (2.0 * math.tan(half_fov_rad))
         )
-        
-        
-    @staticmethod
-    def _generate_prbs(n: int, amplitude: float, seed: int = 42) -> list[float]:
-        """
-        Generate a pseudo-random binary sequence of length n with values
-        ±amplitude.  Used to excite plant dynamics for system identification.
-
-        n         : Number of steps.
-        amplitude : Magnitude of each step in degrees.
-        seed      : RNG seed for reproducibility.
-        """
-        rng = random.Random(seed)
-        return [amplitude if rng.random() > 0.5 else -amplitude for _ in range(n)]
-        
-    def _handle_sysid_tick(self, obj_x: int, obj_y: int, cx: int, cy: int) -> None:
-            """
-            Open-loop PRBS tick for system identification.
-
-            On first call: computes safe PRBS amplitude from the iron's current
-            angular offset and FOV bounds, generates sequences, and saves base position.
-            Each subsequent call: advances the PRBS index at sysid_freq_hz, commands
-            the mount, and logs [dx_ang, dy_ang, cmd_pan, cmd_tilt, t].
-            """
-            t_now  = time.perf_counter()
-            dx_px  = obj_x - cx
-            dy_px  = obj_y - cy
-            angle_pan  = self._pixel_to_angle(dx_px, self._half_hfov_rad, self._frame_w)
-            angle_tilt = self._pixel_to_angle(dy_px, self._half_vfov_rad, self._frame_h)
-
-            # ── First detection: initialize PRBS ──────────────────────────────
-            if not self._sysid_active:
-                self._sysid_base_pan  = self._mount.get_pan()
-                self._sysid_base_tilt = self._mount.get_tilt()
-
-                hfov_half = math.degrees(self._half_hfov_rad)   # half-FOV in deg
-                vfov_half = math.degrees(self._half_vfov_rad)
-
-                # Max perturbation that keeps iron in frame (image formula)
-                margin    = 0.2
-                amp_pan   = (hfov_half - abs(angle_pan))  * margin
-                amp_tilt  = (vfov_half - abs(angle_tilt)) * margin
-
-                # Also clamp so base ± amplitude stays within servo travel limits
-                p_min, p_max = self._pan_limits
-                t_min, t_max = self._tilt_limits
-                amp_pan  = max(1.0, min(amp_pan,
-                                        self._sysid_base_pan  - p_min,
-                                        p_max - self._sysid_base_pan))
-                amp_tilt = max(1.0, min(amp_tilt,
-                                        self._sysid_base_tilt - t_min,
-                                        t_max - self._sysid_base_tilt))
-
-                n_steps = int(self._sysid_duration_s * self._sysid_freq_hz)
-                # Different seeds so pan/tilt sequences are decorrelated
-                self._sysid_seq_pan  = self._generate_prbs(n_steps, amp_pan,  seed=42)
-                self._sysid_seq_tilt = self._generate_prbs(n_steps, amp_tilt, seed=137)
-                self._sysid_index         = 0
-                self._sysid_start_t       = t_now
-                self._sysid_last_switch_t = t_now
-                self._sysid_active        = True
-
-                print(
-                    f"[sysid] Initialized | "
-                    f"base=({self._sysid_base_pan:.1f}°, {self._sysid_base_tilt:.1f}°) | "
-                    f"amp=({amp_pan:.2f}°, {amp_tilt:.2f}°) | "
-                    f"steps={n_steps} | duration={self._sysid_duration_s:.0f}s"
-                )
-
-            # ── Check if collection is complete ───────────────────────────────
-            elapsed = t_now - self._sysid_start_t
-            if elapsed >= self._sysid_duration_s:
-                if not self._sysid_done:
-                    print(f"[sysid] Complete — {self._sysid_index} steps logged → {self._sysid_filepath}")
-                    self._sysid_done = True
-                return
-
-            # ── Advance PRBS index at sysid_freq_hz ──────────────────────────
-            step_period = 1.0 / self._sysid_freq_hz
-            if (t_now - self._sysid_last_switch_t) >= step_period:
-                if self._sysid_index < len(self._sysid_seq_pan) - 1:
-                    self._sysid_index += 1
-                self._sysid_last_switch_t = t_now
-
-            # ── Command mount ─────────────────────────────────────────────────
-            cmd_pan  = self._sysid_base_pan  + self._sysid_seq_pan[self._sysid_index]
-            cmd_tilt = self._sysid_base_tilt + self._sysid_seq_tilt[self._sysid_index]
-            self._mount.set_position(cmd_pan, cmd_tilt)
-
-            # ── Log: [pan_angular_disp, tilt_angular_disp, cmd_pan, cmd_tilt, t] ──
-            self._write_control_graph(
-                filename=self._sysid_filepath,
-                dx_ang=angle_pan,
-                dy_ang=angle_tilt,
-                cmd_pan_ang=cmd_pan,
-                cmd_tilt_ang=cmd_tilt,
-            )
 
     def _log(self, msg: str) -> None:
         if self._debug:
