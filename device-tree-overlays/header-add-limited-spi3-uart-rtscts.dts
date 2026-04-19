@@ -2,7 +2,7 @@
 
 / {
 	jetson-header-name = "Jetson 40pin Header";
-	overlay-name = "User Custom [2026-04-18-205004]";
+	overlay-name = "User Custom [2026-04-18-215911]";
 	compatible = "nvidia,p3768-0000+p3767-0000\0nvidia,p3768-0000+p3767-0001\0nvidia,p3768-0000+p3767-0003\0nvidia,p3768-0000+p3767-0004\0nvidia,p3768-0000+p3767-0005\0nvidia,p3768-0000+p3767-0000-super\0nvidia,p3768-0000+p3767-0001-super\0nvidia,p3768-0000+p3767-0003-super\0nvidia,p3768-0000+p3767-0004-super\0nvidia,p3768-0000+p3767-0005-super\0nvidia,p3509-0000+p3767-0000\0nvidia,p3509-0000+p3767-0001\0nvidia,p3509-0000+p3767-0003\0nvidia,p3509-0000+p3767-0004\0nvidia,p3509-0000+p3767-0005";
 
 	fragment@0 {
@@ -17,7 +17,7 @@
 
 				hdr40-pin11 {
 					nvidia,pins = "uart1_rts_pr4";
-					nvidia,function = "gp";
+					nvidia,function = "uarta";
 					nvidia,tristate = <0x00>;
 					nvidia,enable-input = <0x00>;
 				};
@@ -45,18 +45,16 @@
 
 				hdr40-pin16 {
 					nvidia,pins = "spi3_cs1_py4";
-					nvidia,function = "gp";
-					nvidia,tristate = <0x00>;
-					nvidia,enable-input = <0x01>;
-					nvidia,pull = <0x02>;
+					nvidia,function = "rsvd1";
+					nvidia,tristate = <0x01>;
+					nvidia,enable-input = <0x00>;
 				};
 
 				hdr40-pin18 {
 					nvidia,pins = "spi3_cs0_py3";
-					nvidia,function = "gp";
-					nvidia,tristate = <0x00>;
-					nvidia,enable-input = <0x01>;
-					nvidia,pull = <0x02>;
+					nvidia,function = "rsvd1";
+					nvidia,tristate = <0x01>;
+					nvidia,enable-input = <0x00>;
 				};
 
 				hdr40-pin19 {
@@ -103,9 +101,9 @@
 
 				hdr40-pin29 {
 					nvidia,pins = "soc_gpio32_pq5";
-					nvidia,function = "gp";
+					nvidia,function = "rsvd0";
 					nvidia,pull = <0x00>;
-					nvidia,tristate = <0x00>;
+					nvidia,tristate = <0x01>;
 					nvidia,enable-input = <0x00>;
 					nvidia,io-high-voltage = <0x00>;
 					nvidia,lpdr = <0x00>;
@@ -113,9 +111,9 @@
 
 				hdr40-pin31 {
 					nvidia,pins = "soc_gpio33_pq6";
-					nvidia,function = "gp";
+					nvidia,function = "rsvd0";
 					nvidia,pull = <0x00>;
-					nvidia,tristate = <0x00>;
+					nvidia,tristate = <0x01>;
 					nvidia,enable-input = <0x00>;
 					nvidia,io-high-voltage = <0x00>;
 					nvidia,lpdr = <0x00>;
@@ -143,10 +141,10 @@
 				};
 
 				hdr40-pin36 {
-					nvidia,pins = "uart_cts_pr5";
-					nvidia,function = "gp";
-					nvidia,tristate = <0x00>;
-					nvidia,enable-input = <0x00>;
+					nvidia,pins = "uart1_cts_pr5";
+					nvidia,function = "uarta";
+					nvidia,tristate = <0x01>;
+					nvidia,enable-input = <0x01>;
 				};
 
 				hdr40-pin37 {
