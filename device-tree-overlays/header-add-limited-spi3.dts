@@ -143,7 +143,7 @@
 				};
 
 				hdr40-pin36 {
-					nvidia,pins = "uart_cts_pr5";
+					nvidia,pins = "uart1_cts_pr5";
 					nvidia,function = "gp";
 					nvidia,tristate = <0x00>;
 					nvidia,enable-input = <0x00>;
