@@ -28,8 +28,8 @@ HALF_HFOV_RAD = math.radians(HFOV_DEG / 2.0)
 HALF_VFOV_RAD = math.radians(VFOV_DEG / 2.0) 
 
 # GPIO pins
-PAN_PIN  = 33
-TILT_PIN = 32
+PAN_PIN  = 32
+TILT_PIN = 33
 
 # Mount angle limits
 PAN_LIMITS  = (0.0, 180.0)
@@ -44,8 +44,8 @@ Tuning order:
 """
 
 # PID gains
-PAN_KP,  PAN_KI,  PAN_KD  = 0.07, 0.005, 0   # 0.02, 0.02
-TILT_KP, TILT_KI, TILT_KD = 0.2, 0.004, 0   # 0.015, 0.015
+PAN_KP,  PAN_KI,  PAN_KD  = 0.25, 0.01, 0.0   #Pre Demo (works) 0.1, 0.005, 0   # 0.02, 0.02
+TILT_KP, TILT_KI, TILT_KD = 0.3, 0.05, 0.0    #Pre Demo (works) 0.2, 0.004, 0   # 0.015, 0.015
 
 # Error sign convention for positve angular error corrections
 PAN_ERROR_SIGN  = -1 # positive because pixel x increases to the right, and positive pan correction should move the camera right

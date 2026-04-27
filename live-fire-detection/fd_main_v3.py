@@ -54,6 +54,7 @@ from servo.pan_tilt_tracking import (          # constants only — no factory f
 )
 import real_time_ml_v3 as ml
 from audio.soundthread_v2 import ThreadedSoundPlayer
+import gas_sensor_model as gas
 
 class FireDistinguisher:
 
@@ -106,6 +107,10 @@ class FireDistinguisher:
         self.meta_path = '/home/firedistinguisher/projects/early-fire-detection-classifier/machine-learning/models/meta-learner/fire_meta_learner_v2.pkl'
         self.models = ml.initialize_fire_models(vis_path=self.vis_path, ir_path=self.ir_path, meta_path=self.meta_path)
 
+        # Gas sensor
+        self.gas_init_calibration_counter = 0
+        self.calibration_samples = []
+        self.gas_detect = " | not calibrated"
         # Audio
         self.player = ThreadedSoundPlayer()
         ThreadedSoundPlayer.set_main_player(self.player)
@@ -123,7 +128,7 @@ class FireDistinguisher:
             pan_kp=PAN_KP,   pan_ki=PAN_KI,   pan_kd=PAN_KD,
             tilt_kp=TILT_KP, tilt_ki=TILT_KI, tilt_kd=TILT_KD,
             scan_speed=1.5,
-            track_speed=5.0,
+            track_speed=3.0,
             pan_sweep_time=4.0,
             track_loss_timeout=3.0,     # Time to wait after losing target before declaring "lost" and resuming scan
             scan_resume_delay=3.0,      # Time to wait after losing target before resuming scan   
@@ -141,7 +146,7 @@ class FireDistinguisher:
         print("Fire acquired - target detected. Stopping scan and tracking.")
         self.player.play(
             "/home/firedistinguisher/projects/early-fire-detection-classifier/live-fire-detection/audio/library/discord_join_sfx.wav",
-            volume=0.05,
+            volume=0.00,
         )
  
     def _cb_fire_lost(self) -> None:
@@ -154,6 +159,49 @@ class FireDistinguisher:
         # Read Sensors
         snapshot = self.sensorsuite.get_snapshot()
         
+        moby_stuff = {
+            "adc0_ch0": snapshot.adc.values[0],
+            "adc0_ch1": snapshot.adc.values[1],
+            "adc0_ch2": snapshot.adc.values[2],
+            "adc1_ch0": snapshot.adc.values[4],
+            "adc1_ch1": snapshot.adc.values[5],
+            "adc1_ch2": snapshot.adc.values[6],
+            "hdc_temp": snapshot.hdc3022.temp,
+            "hdc_humidity": snapshot.hdc3022.humidity,
+            "co2_ppm": snapshot.sen0219.ppm,
+            "co_ppm": snapshot.ze07co.ppm
+        }
+
+        ############################################################################################################################
+        
+        # print("calibration_samples length: ", len(self.calibration_samples))
+        # print("CALIBRATING GAS SENSORS...PLEASE HOLD (1 minute)")
+        cfg = gas.FireDetectorConfig(
+        sample_rate_hz=25.0,
+        min_calibration_samples=1500,  # 60 seconds at 25 Hz
+        )
+        
+        if self.gas_init_calibration_counter < cfg.min_calibration_samples:    
+            self.calibration_samples.append(moby_stuff)
+            # time.sleep(1.0 / cfg.sample_rate_hz)
+            self.gas_init_calibration_counter += 1
+        if self.gas_init_calibration_counter == cfg.min_calibration_samples:         
+            print("Done calibrating gas sensors.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            self.gas_init_calibration_counter += 1
+            
+        if self.gas_init_calibration_counter >= cfg.min_calibration_samples: 
+            detector = gas.init_detector(self.calibration_samples, config=cfg)
+            result = detector.process_sample(moby_stuff)
+
+            if result.abnormal:
+                print("Abnormal Gas Detected!")
+                
+            else:
+                print("Normal")
+            
+        
+        ############################################################################################################################
+        
         # Perform ML
         ml_results = ml.process_fused_detection(
             snapshot.reg.frame,
@@ -163,8 +211,8 @@ class FireDistinguisher:
             returnAnnotatedImg=False
         )
         min_temp, max_temp, avg_temp, center_temp  = self.sensorsuite.get_sensor_objects().ir_camera.get_temp_stats()
-        self.web.set_fire_subtext("Hello World!" + " Min temp =" + str(min_temp) + " Max temp = " + str(max_temp) + " Avg temp = " + str(avg_temp) + " Center temp = " + str(center_temp))
-        
+        #self.web.set_fire_subtext("Hello World!" + " Min temp =" + str(min_temp) + " Max temp = " + str(max_temp) + " Avg temp = " + str(avg_temp) + " Center temp = " + str(center_temp))
+        self.web.set_fire_subtext(f"Counter: {self.gas_init_calibration_counter}   {self.gas_detect}")
         # Pass ML results to Web Stream
         self.web.set_fire_detected(ml_results["meta_decision"]["fire_detection_boolean"])
         self.web.update_ml_results(ml_results)
@@ -178,7 +226,6 @@ class FireDistinguisher:
         # Pan-Tilt Tracking: pass ml results to tracker and update pan-tilt angles accordingly
         self.tracker.update(ml_results)
       
-
     def program_start(self):
         # Main clock
         period = 1.0 / constants.FPS
@@ -189,9 +236,9 @@ class FireDistinguisher:
             now = time.perf_counter()
             
             # Regulate to 25 Hz - comment out to go as fast as possible
-            #if now < next_time:
-                #time.sleep(next_time - now)
-                #continue
+            if now < next_time:
+                time.sleep(next_time - now)
+                continue
 
             # ----- detect latency lateness -----
             lateness = now - next_time

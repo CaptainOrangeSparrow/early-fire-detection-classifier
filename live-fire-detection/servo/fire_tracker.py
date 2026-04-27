@@ -77,7 +77,7 @@ class PID:
         error: angular tracking error in degrees.
         """
 
-        if abs(px_error) < 50:  # Deadband threshold in pixels to prevent jitter when the target is close enough to center
+        if abs(px_error) < 8:  # Deadband threshold in pixels to prevent jitter when the target is close enough to center
             return 0.0
 
         delta = (
@@ -254,7 +254,7 @@ class FireTracker:
         
         # Speeds
         scan_speed:     float = 1.5,
-        track_speed:    float = 5.0,
+        track_speed:    float = 3.0,
         pan_sweep_time: float = 4.0,
         
         # Timing

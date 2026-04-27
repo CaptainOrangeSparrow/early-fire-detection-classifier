@@ -59,15 +59,19 @@ class TLV5616:
 
 def main():
     dac = TLV5616(spi_bus=1, spi_dev=0, fs_pin=11, cs_pin=36)
-    
+    sine = False
+    ramp = True
     try:
         
+        sample_rate_hz=1000
+        sine_freq_hz=0.12
+
         phase=0.0
-        dt = 1.0/10000
-        phase_step = 2.0 * math.pi * 100.0 / 10000
+        dt = 1.0 / sample_rate_hz
+        phase_step = 2.0 * math.pi * sine_freq_hz / sample_rate_hz
         next_t = time.perf_counter()
 
-        while True:
+        while sine:
             y = 0.5 + 0.49 * math.sin(phase)
 
             if y < 0.0:
@@ -75,7 +79,7 @@ def main():
             elif y > 1.0:
                 y = 1.0
 
-            dac_code = int(round(y * 4095))
+            dac_code = int(round(y * 1023))
             dac.dac_out(dac_code)
 
             phase += phase_step
@@ -89,10 +93,24 @@ def main():
             else:
                 # If timing slips, resync to avoid runaway lag
                 next_t = time.perf_counter()
+        
+        ramp_step = 0.2
+        pos = 0
+        direction = 1
+        while ramp:
+            dac.dac_out(int(pos))
+            time.sleep(dt)
+            pos += (ramp_step * direction)
+            if pos < 0:
+                direction = 1
+                pos = 0
+            if pos > 1023:
+                direction = -1
+                pos = 1023
 
         dac.dac_out(0xFFF)
-        #time.sleep(1)
-        #dac.dac_out(0xFFF)
+        time.sleep(5)
+        dac.dac_out(0x000)
         #time.sleep(1)
         #dac.dac_out(0x400)
         #time.sleep(1)
